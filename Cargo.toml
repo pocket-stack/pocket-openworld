@@ -1,0 +1,27 @@
+[package]
+name = "pocket-openworld"
+description = "A deterministic systemic open-world prototype rendered by Pocket3D"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/pocket-stack/pocket-openworld"
+publish = false
+
+[dependencies]
+pocket3d = { path = "vendor/pocketjs/engine/pocket3d/crates/pocket3d" }
+pocket3d-world = { path = "vendor/pocketjs/engine/pocket3d/crates/pocket3d-world" }
+winit = "0.30"
+glam = { version = "0.33", default-features = false, features = ["std"] }
+anyhow = "1"
+env_logger = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+gltf = { version = "1.4", features = ["extras"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Record engine revision
+        run: git submodule status --recursive
+
+      - name: Check formatting
+        run: cargo fmt --package pocket-openworld -- --check
+
+      - name: Test
+        run: cargo test --locked --package pocket-openworld
+
+      - name: Lint
+        run: cargo clippy --locked --package pocket-openworld --all-targets -- -D warnings
+
+      - name: Create acceptance directory
+        run: mkdir -p artifacts
+
+      - name: Verify orchard interactions
+        run: >-
+          cargo run --locked --package pocket-openworld --
+          --headless --scenario orchard-fire --ticks 720 --seed 7 --size 960x600
+          --receipt artifacts/orchard-fire.json
+          --screenshot artifacts/orchard-fire.png
+
+      - name: Verify water rendering
+        run: >-
+          cargo run --locked --package pocket-openworld --
+          --headless --scenario character-water --ticks 47 --size 960x600
+          --receipt artifacts/character-water.json
+          --screenshot artifacts/character-water.png
+
+      - name: Verify sustained extinguishing
+        run: >-
+          cargo run --locked --package pocket-openworld --
+          --headless --scenario campfire-douse --ticks 390 --size 960x600
+          --receipt artifacts/campfire-douse.json
+          --screenshot artifacts/campfire-douse.png
+
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pocket-openworld-acceptance
+          path: artifacts/
+          if-no-files-found: error

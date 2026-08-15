@@ -1,0 +1,165 @@
+{
+  "clips": {
+    "Chop": {
+      "channels": 57,
+      "duration_seconds": 1.2
+    },
+    "Idle": {
+      "channels": 57,
+      "duration_seconds": 1.6
+    },
+    "Walk": {
+      "channels": 57,
+      "duration_seconds": 1.1
+    }
+  },
+  "generator": {
+    "blender_version": "5.1.2",
+    "script": "generate_character.py"
+  },
+  "geometry": {
+    "exported_triangles": 6752,
+    "exported_vertices": 5410,
+    "material_count": 14,
+    "materials": [
+      "Leather umber",
+      "Leather edge",
+      "Trouser charcoal",
+      "Scarf cream",
+      "Tunic teal",
+      "Tunic edge",
+      "Axe edge",
+      "Skin highlight",
+      "Skin warm",
+      "Eye ink",
+      "Eye glint",
+      "Hair auburn",
+      "Hair edge",
+      "Axe steel"
+    ],
+    "meshes": 1,
+    "primitives": 14,
+    "source_triangles": 6752,
+    "source_vertices": 3487
+  },
+  "outputs": {
+    "blend": "explorer.blend",
+    "glb": "explorer.glb",
+    "glb_sha256": "7948c785bb7bf5df2cab1254ac5cda35d036a2b6c9ff910ae19a88f87c95dbc1",
+    "previews": [
+      "previews/idle.png",
+      "previews/walk.png",
+      "previews/chop.png",
+      "previews/walk-rear.png",
+      "previews/walk-side.png"
+    ]
+  },
+  "rig": {
+    "bone_count": 19,
+    "bones": [
+      "axe.R",
+      "chest",
+      "foot.L",
+      "foot.R",
+      "forearm.L",
+      "forearm.R",
+      "hand.L",
+      "hand.R",
+      "head",
+      "hips",
+      "neck",
+      "root",
+      "shin.L",
+      "shin.R",
+      "spine",
+      "thigh.L",
+      "thigh.R",
+      "upper_arm.L",
+      "upper_arm.R"
+    ],
+    "front_axis": "-Z",
+    "rest_foot_y": 0.0,
+    "rigid_weighted_vertices_by_bone": {
+      "axe.R": 270,
+      "chest": 184,
+      "foot.L": 112,
+      "foot.R": 112,
+      "forearm.L": 144,
+      "forearm.R": 144,
+      "hand.L": 138,
+      "hand.R": 138,
+      "head": 1111,
+      "hips": 320,
+      "neck": 84,
+      "shin.L": 200,
+      "shin.R": 200,
+      "thigh.L": 72,
+      "thigh.R": 72,
+      "upper_arm.L": 114,
+      "upper_arm.R": 72
+    },
+    "skins": 1,
+    "up_axis": "+Y"
+  },
+  "schema": "pocket3d-character-receipt-v1",
+  "tests": {
+    "axe_blade_center_clearance_min_m": 0.5439,
+    "axe_blade_forward_travel_m": 1.4226,
+    "axe_blade_outward": true,
+    "axe_blade_outward_min_m": 0.1961,
+    "axe_blade_rest_center_clearance_m": 0.5958,
+    "axe_blade_rest_centroid_blender_xyz": [
+      -0.5958,
+      0.038,
+      0.2705
+    ],
+    "axe_blade_rest_outward_from_handle_m": 0.2304,
+    "axe_handle_rest_centroid_blender_xyz": [
+      -0.3654,
+      0.0574,
+      0.6869
+    ],
+    "blender_rest_min_z": -0.0,
+    "chop_axe_swing_m": 1.7829,
+    "chop_contact_max_error_m": 0.0,
+    "chop_hand_travel_m": 1.1607,
+    "fresh_import": {
+      "actions": [
+        "Chop",
+        "Idle",
+        "Walk"
+      ],
+      "armatures": 1,
+      "bones": [
+        "axe.R",
+        "chest",
+        "foot.L",
+        "foot.R",
+        "forearm.L",
+        "forearm.R",
+        "hand.L",
+        "hand.R",
+        "head",
+        "hips",
+        "neck",
+        "root",
+        "shin.L",
+        "shin.R",
+        "spine",
+        "thigh.L",
+        "thigh.R",
+        "upper_arm.L",
+        "upper_arm.R"
+      ],
+      "meshes": 1,
+      "passed": true
+    },
+    "glb_self_contained": true,
+    "walk_arm_forward_travel_m": 0.7032,
+    "walk_arm_lateral_drift_m": 0.0001,
+    "walk_arm_local_x_alignment": 1.0,
+    "walk_arm_phase_error_m": 0.0,
+    "walk_contact_max_error_m": 0.004,
+    "walk_stride_m": 0.7688
+  }
+}
