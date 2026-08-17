@@ -2,6 +2,12 @@
 
 ## Active local Frieren model
 
+`frieren.glb`, `frieren-previews/`, and `frieren-receipt.json` are ordinary
+checked-in Git files. Cloning this private repository is sufficient to build
+and run the current character; no post-clone asset download is required.
+`import_frieren.py` is the reproducible regeneration path, not a build-time
+dependency.
+
 The local runtime uses `frieren.glb`, derived from dedastore's free
 `frieren (.fbx .blend)` BOOTH download. Obtain the source separately from
 <https://booth.pm/ja/items/5469071>, then run:

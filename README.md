@@ -60,6 +60,11 @@ The receipt proves simulation state; the PNG proves the rendered result.
 
 ## Character asset
 
+The complete derived runtime asset is checked into this repository. A fresh
+clone receives `assets/character/frieren.glb`, its six QA previews, the
+machine-readable receipt, and the importer; normal builds do not need Blender,
+a BOOTH account, or the original `.blend` file.
+
 The active local character is generated from dedastore's free BOOTH
 `frieren (.fbx .blend)` download. The importer preserves its 61-joint skin and
 adds one staff-tip socket. The runtime selects five named glTF clips:
@@ -71,8 +76,9 @@ adds one staff-tip socket. The runtime selects five named glTF clips:
 - `Cast` is selected by the `F` ember action.
 - `Water` is selected by the `Q` water action.
 
-After downloading the model, generate the embedded runtime GLB, six studio
-previews, and a machine-readable validation receipt with:
+To reproduce or modify the derived files, first obtain the source model from
+BOOTH and regenerate the embedded runtime GLB, six studio previews, and
+machine-readable validation receipt with:
 
 ```sh
 /Applications/Blender.app/Contents/MacOS/Blender \
