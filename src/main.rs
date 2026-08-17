@@ -18,12 +18,16 @@ const SCENARIOS: &[&str] = &[
     "idle",
     "character-walk",
     "character-chop",
+    "character-cast",
     "character-carry",
     "character-water",
+    "grass-fire",
     "campfire-douse",
 ];
 const CHARACTER_CARRY_CAPTURE_TICK: u64 = 360;
+const CHARACTER_CAST_CAPTURE_TICK: u64 = 24;
 const CHARACTER_WATER_CAPTURE_TICK: u64 = 47;
+const GRASS_FIRE_CAPTURE_TICK: u64 = 48;
 
 #[derive(Debug)]
 struct Args {
@@ -85,10 +89,22 @@ fn run_headless(args: Args) -> Result<()> {
             "character-carry requires --ticks {CHARACTER_CARRY_CAPTURE_TICK} so the captured frame proves the held apple"
         );
     }
+    if args.scenario == "character-cast" {
+        ensure!(
+            args.ticks == CHARACTER_CAST_CAPTURE_TICK,
+            "character-cast requires --ticks {CHARACTER_CAST_CAPTURE_TICK} so the captured frame proves the active staff cast"
+        );
+    }
     if args.scenario == "character-water" {
         ensure!(
             args.ticks == CHARACTER_WATER_CAPTURE_TICK,
             "character-water requires --ticks {CHARACTER_WATER_CAPTURE_TICK} so the captured frame proves the active water burst"
+        );
+    }
+    if args.scenario == "grass-fire" {
+        ensure!(
+            args.ticks == GRASS_FIRE_CAPTURE_TICK,
+            "grass-fire requires --ticks {GRASS_FIRE_CAPTURE_TICK} so the captured frame proves active vegetation combustion"
         );
     }
     let gpu = Gpu::new_headless()?;
@@ -97,6 +113,9 @@ fn run_headless(args: Args) -> Result<()> {
     game.init(&gpu, &mut renderer)?;
     if args.scenario == "campfire-douse" {
         game.prepare_campfire_douse_scenario();
+    }
+    if args.scenario == "grass-fire" {
+        game.prepare_grass_fire_scenario();
     }
     let mut input = Input::default();
     for turn in 0..args.ticks {
@@ -142,10 +161,22 @@ fn run_headless(args: Args) -> Result<()> {
             "character-carry acceptance failed: no apple attached to the explorer"
         );
     }
+    if args.scenario == "character-cast" {
+        ensure!(
+            game.ember_cast_active(),
+            "character-cast acceptance failed: staff casting animation was not active at capture"
+        );
+    }
     if args.scenario == "character-water" {
         ensure!(
             game.water_burst_active(),
             "character-water acceptance failed: water burst was not active at capture"
+        );
+    }
+    if args.scenario == "grass-fire" {
+        ensure!(
+            game.grass_ignited(),
+            "grass-fire acceptance failed: no grass entity reached ignition"
         );
     }
     if args.scenario == "campfire-douse" {
@@ -200,7 +231,7 @@ fn parse_args() -> Result<Args> {
             }
             "-h" | "--help" => {
                 println!(
-                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-carry|character-water|campfire-douse\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
+                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-cast|character-carry|character-water|grass-fire|campfire-douse\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
                 );
                 std::process::exit(0);
             }
@@ -229,17 +260,35 @@ fn apply_scenario_script(input: &mut Input, scenario: &str, turn: u64) {
                 input.inject_key(KeyCode::Space, false);
             }
         }
+        "character-cast" => {
+            input.inject_key(KeyCode::ArrowLeft, turn < 10);
+            input.inject_key(KeyCode::KeyF, turn == 10);
+            if turn == 11 {
+                input.inject_key(KeyCode::KeyF, false);
+            }
+        }
         "character-carry" => {
             apply_carry_script(input, turn);
             input.inject_key(KeyCode::KeyS, (302..332).contains(&turn));
             input.inject_key(KeyCode::ArrowLeft, (334..356).contains(&turn));
-            input.inject_key(KeyCode::KeyD, (357..359).contains(&turn));
+            // The real-scale fruit settles closer to the trunk than the old
+            // oversized proxy, so take a short approach before pickup.
+            input.inject_key(
+                KeyCode::KeyD,
+                (284..292).contains(&turn) || (357..359).contains(&turn),
+            );
         }
         "character-water" => {
             input.inject_key(KeyCode::ArrowLeft, turn < 35);
             input.inject_key(KeyCode::KeyQ, turn == 35);
             if turn == 36 {
                 input.inject_key(KeyCode::KeyQ, false);
+            }
+        }
+        "grass-fire" => {
+            input.inject_key(KeyCode::KeyF, turn == 1);
+            if turn == 2 {
+                input.inject_key(KeyCode::KeyF, false);
             }
         }
         "campfire-douse" => apply_campfire_douse_script(input, turn),
@@ -276,6 +325,10 @@ mod tests {
         apply_scenario_script(&mut chop, "character-chop", 108);
         assert!(chop.key_down(KeyCode::Space));
 
+        let mut cast = Input::default();
+        apply_scenario_script(&mut cast, "character-cast", 10);
+        assert!(cast.key_down(KeyCode::KeyF));
+
         let mut carry = Input::default();
         apply_scenario_script(&mut carry, "character-carry", 300);
         assert!(carry.key_down(KeyCode::KeyE));
@@ -284,15 +337,19 @@ mod tests {
         apply_scenario_script(&mut water, "character-water", 35);
         assert!(water.key_down(KeyCode::KeyQ));
 
+        let mut grass = Input::default();
+        apply_scenario_script(&mut grass, "grass-fire", 1);
+        assert!(grass.key_down(KeyCode::KeyF));
+
         let mut campfire = Input::default();
         apply_scenario_script(&mut campfire, "campfire-douse", 120);
         assert!(campfire.key_down(KeyCode::KeyQ));
     }
 
     #[test]
-    fn explorer_glb_contains_the_runtime_rig_contract() {
-        let bytes = include_bytes!("../assets/character/explorer.glb");
-        let gltf = gltf::Gltf::from_slice(bytes).expect("checked-in explorer.glb must parse");
+    fn frieren_glb_contains_the_runtime_rig_contract() {
+        let bytes = include_bytes!("../assets/character/frieren.glb");
+        let gltf = gltf::Gltf::from_slice(bytes).expect("frieren.glb must parse");
         assert!(
             gltf.blob.is_some(),
             "the runtime GLB must be self-contained"
@@ -306,7 +363,10 @@ mod tests {
             .animations()
             .map(|animation| animation.name().unwrap_or("<unnamed>"))
             .collect();
-        assert_eq!(animation_names, BTreeSet::from(["Chop", "Idle", "Walk"]));
+        assert_eq!(
+            animation_names,
+            BTreeSet::from(["Cast", "Chop", "Idle", "Walk", "Water"])
+        );
         let clip_targets = |name: &str| -> BTreeSet<String> {
             gltf.animations()
                 .find(|animation| animation.name() == Some(name))
@@ -316,11 +376,19 @@ mod tests {
                 .collect()
         };
         let walk_targets = clip_targets("Walk");
-        assert!(walk_targets.contains("thigh.L") && walk_targets.contains("thigh.R"));
+        assert!(walk_targets.contains("leg.L") && walk_targets.contains("leg.R"));
         let chop_targets = clip_targets("Chop");
         assert!(
-            chop_targets.contains("upper_arm.R") && chop_targets.contains("forearm.R"),
-            "Chop must animate the axe-side arm chain"
+            chop_targets.contains("Arm.R") && chop_targets.contains("foreArm.R"),
+            "Chop must animate Frieren's staff-side arm chain"
+        );
+        let cast_targets = clip_targets("Cast");
+        assert!(cast_targets.contains("staff.R") && cast_targets.contains("hand.L"));
+        let water_targets = clip_targets("Water");
+        assert!(
+            water_targets.contains("staff.R")
+                && water_targets.contains("staff.tip")
+                && water_targets.contains("hand.L")
         );
 
         let joint_names: BTreeSet<_> = gltf
@@ -329,25 +397,26 @@ mod tests {
             .filter_map(|node| node.name())
             .collect();
         for required in [
-            "root",
-            "hips",
-            "spine",
-            "chest",
-            "neck",
-            "head",
-            "upper_arm.L",
-            "forearm.L",
+            "Hips",
+            "Spine",
+            "Spine1",
+            "Spine2",
+            "Neck",
+            "Head",
+            "Arm.L",
+            "foreArm.L",
             "hand.L",
-            "upper_arm.R",
-            "forearm.R",
+            "Arm.R",
+            "foreArm.R",
             "hand.R",
-            "thigh.L",
-            "shin.L",
+            "leg.L",
+            "knee.L",
             "foot.L",
-            "thigh.R",
-            "shin.R",
+            "leg.R",
+            "knee.R",
             "foot.R",
-            "axe.R",
+            "staff.R",
+            "staff.tip",
         ] {
             assert!(
                 joint_names.contains(required),
@@ -359,7 +428,7 @@ mod tests {
             gltf.nodes()
                 .filter(|node| node.mesh().is_some())
                 .all(|node| node.skin().is_some()),
-            "every runtime mesh, including the axe, must be driven by the skin"
+            "every Frieren runtime mesh, including the staff, must be driven by a skin"
         );
 
         let mut triangles = 0_usize;
@@ -381,35 +450,41 @@ mod tests {
         }
         assert!(
             (2_000..=8_000).contains(&triangles),
-            "explorer mesh budget changed: {triangles} triangles"
+            "Frieren mesh budget changed: {triangles} triangles"
         );
         assert_eq!(
             primitive_count, skinned_primitives,
-            "every explorer primitive must carry skin weights"
+            "every Frieren primitive must carry skin weights"
         );
         assert!(
             primitive_count <= 16,
-            "explorer draw-call budget changed: {primitive_count} primitives"
+            "Frieren draw-call budget changed: {primitive_count} primitives"
         );
-        assert!(
-            gltf.materials().count() >= 6,
-            "explorer lost authored material separation"
+        assert_eq!(
+            gltf.materials().count(),
+            1,
+            "Frieren material contract changed"
         );
+        assert_eq!(gltf.images().count(), 1, "Frieren texture was not embedded");
 
         let (document, buffers, _) = gltf::import_slice(bytes).expect("GLB payload must import");
-        let skin = document.skins().next().expect("explorer must have a skin");
-        assert_eq!(
-            document.skins().count(),
-            1,
-            "explorer must use one joint palette"
-        );
-        let axe_joint = skin
+        assert!((1..=4).contains(&document.skins().count()));
+        let staff_node = document
+            .nodes()
+            .find(|node| node.name() == Some("staff"))
+            .expect("Frieren GLB must retain the named staff node");
+        let staff_skin = staff_node
+            .skin()
+            .expect("staff node must reference its skin");
+        let staff_mesh = staff_node
+            .mesh()
+            .expect("staff node must reference its mesh");
+        let staff_joint = staff_skin
             .joints()
-            .position(|joint| joint.name() == Some("axe.R"))
-            .expect("axe.R must be in the skin") as u16;
-        let axe_weighted_vertices = document
-            .meshes()
-            .flat_map(|mesh| mesh.primitives())
+            .position(|joint| joint.name() == Some("staff.R"))
+            .expect("staff.R must be in the staff skin") as u16;
+        let staff_weighted_vertices = staff_mesh
+            .primitives()
             .map(|primitive| {
                 let reader = primitive
                     .reader(|buffer| buffers.get(buffer.index()).map(|data| data.0.as_slice()));
@@ -424,14 +499,14 @@ mod tests {
                 joints
                     .zip(weights)
                     .filter(|(joints, weights)| {
-                        (0..4).any(|index| joints[index] == axe_joint && weights[index] > 0.999)
+                        (0..4).any(|index| joints[index] == staff_joint && weights[index] > 0.999)
                     })
                     .count()
             })
             .sum::<usize>();
         assert!(
-            axe_weighted_vertices >= 100,
-            "axe geometry is no longer rigidly bound to axe.R: {axe_weighted_vertices} vertices"
+            staff_weighted_vertices >= 100,
+            "staff geometry is no longer rigidly bound to staff.R: {staff_weighted_vertices} vertices"
         );
     }
 }

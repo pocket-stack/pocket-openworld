@@ -4,7 +4,7 @@ This repository contains an original Pocket3D proof of concept for a small
 systemic world. A deterministic simulation owns bodies, attachments,
 structural damage, heat, moisture, fuel, and combustion. The Pocket3D adapter
 maps simulation state to procedural low-poly geometry, particles, lighting,
-a third-person camera, a rigged original explorer, and a debug HUD.
+a third-person camera, a locally imported rigged Frieren model, and a debug HUD.
 
 The implementation does not include or derive game assets, source code,
 configuration data, shaders, or numeric tuning from *The Legend of Zelda:
@@ -30,11 +30,13 @@ by the application; engine changes remain owned by the PocketJS repository.**
 
 Controls:
 
-- `WASD` moves the explorer.
+- `WASD` moves Frieren.
 - Mouse movement or arrow keys orbit the camera.
-- `Space` swings the axe at the nearest tree or log.
-- `F` casts an ember at the aimed reactive object.
-- `Q` fires a short forward water burst from the explorer's waist. The stream
+- `Space` performs a staff strike at the nearest tree or log.
+- `F` plays the staff-casting animation and casts an ember at the aimed
+  reactive object, including grass.
+- `Q` raises the staff and fires a short forward water burst from its animated
+  ornate tip. The stream
   always appears, even over empty ground, and douses every reactive object
   inside its widening corridor.
 - `E` picks up or drops the nearest apple.
@@ -56,27 +58,32 @@ cargo run --locked -- \
 become rigid bodies, ignites the fallen wood, and records ordered world events.
 The receipt proves simulation state; the PNG proves the rendered result.
 
-## Explorer asset
+## Character asset
 
-The explorer is an original Blender-generated character with a 19-joint skin,
-modeled face and hair, layered clothing, articulated hands, and an axe bound to
-the right-hand chain. The runtime selects three named glTF clips:
+The active local character is generated from dedastore's free BOOTH
+`frieren (.fbx .blend)` download. The importer preserves its 61-joint skin and
+adds one staff-tip socket. The runtime selects five named glTF clips:
 
-- `Idle` is a looping breathing and look pose.
+- `Idle` is a looping at-ease stance with staggered feet and the staff resting
+  outside the skirt silhouette.
 - `Walk` is a looping stride with opposing arm motion.
-- `Chop` is a non-looping wind-up, strike, and recovery.
+- `Chop` is a non-looping staff strike and recovery.
+- `Cast` is selected by the `F` ember action.
+- `Water` is selected by the `Q` water action.
 
-The checked-in generator produces the editable source, embedded runtime GLB,
-five studio previews, and a machine-readable validation receipt:
+After downloading the model, generate the embedded runtime GLB, six studio
+previews, and a machine-readable validation receipt with:
 
 ```sh
 /Applications/Blender.app/Contents/MacOS/Blender \
   --background --factory-startup \
-  --python assets/character/generate_character.py
+  --python assets/character/import_frieren.py -- \
+  --source "/Users/evan/Downloads/friren_1.1/frieren model.blend"
 ```
 
-The same script works with a `blender` executable on other platforms. See
-`assets/character/README.md` for the output contract and validation details.
+The BOOTH page does not provide an explicit redistribution license. The source
+and derived model bytes are not covered by this repository's MIT license; see
+`ATTRIBUTION.md` and `assets/character/README.md` before publishing them.
 
 ## Character acceptance
 
@@ -94,8 +101,12 @@ cargo run --locked -- \
   --screenshot /tmp/pocket-openworld-character-walk.png
 
 cargo run --locked -- \
-  --headless --scenario character-chop --ticks 117 --size 1440x900 \
+  --headless --scenario character-chop --ticks 119 --size 1440x900 \
   --screenshot /tmp/pocket-openworld-character-chop.png
+
+cargo run --locked -- \
+  --headless --scenario character-cast --ticks 24 --size 1440x900 \
+  --screenshot /tmp/pocket-openworld-character-cast.png
 
 cargo run --locked -- \
   --headless --scenario character-carry --ticks 360 --size 1440x900 \
@@ -106,18 +117,26 @@ cargo run --locked -- \
   --screenshot /tmp/pocket-openworld-character-water.png
 
 cargo run --locked -- \
+  --headless --scenario grass-fire --ticks 48 --size 1440x900 \
+  --receipt /tmp/pocket-openworld-grass-fire.json \
+  --screenshot /tmp/pocket-openworld-grass-fire.png
+
+cargo run --locked -- \
   --headless --scenario campfire-douse --ticks 390 --size 1440x900 \
   --receipt /tmp/pocket-openworld-campfire-douse.json
 ```
 
-`cargo test --locked --package pocket-openworld`
-also parses the checked-in GLB and checks the clip names, required joints,
-skinned primitives, material separation, triangle budget, animation priority,
-camera target, foot-to-ground transform, hand socket, and water corridor. The
-`character-carry` and `character-water` runs also fail if their interaction is
-not active at the captured frame.
+`cargo test --locked --package pocket-openworld` also parses the local GLB and
+checks the five clip names, required joints, skinned primitives, embedded
+texture, triangle budget, animation priority, camera target, foot-to-ground
+transform, hand socket, staff binding, and water corridor. The
+`character-cast`, `character-carry`, `character-water`, and `grass-fire` runs
+also fail if their interaction is not active at the captured frame. Grass
+coverage uses the same reactive simulation for sphere and capsule tuft
+colliders; the test matrix ignites both configurations without tag-specific
+solver branches.
 
-`campfire-douse` places the explorer at close range without changing the world
+`campfire-douse` places the character at close range without changing the world
 material rules, waits for the two ordinary logs to ignite, and sends one
 deterministic Q burst through the curved spray tube. Its receipt records emitted
 and delivered water and fails unless the flame plus both logs are extinguished,

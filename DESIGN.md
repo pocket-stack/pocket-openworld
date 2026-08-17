@@ -103,11 +103,12 @@ repository. The scene uses reusable assets with per-instance transforms and
 tints for terrain, trunk, canopy, apple, rock, grass, and shadow discs. Fire
 and embers use the additive sprite pass.
 
-**The explorer uses Pocket3D's normal glTF skin and clip path.** A reproducible
-Blender generator authors the face, hair, clothing layers, hands, boots, axe,
-19-joint armature, and `Idle`, `Walk`, and `Chop` actions. The self-contained
-GLB is embedded in the executable and loaded through `ModelAsset`; the
-application does not define a second animation renderer.
+**The active local character uses Pocket3D's normal glTF skin and clip path.**
+The Frieren importer preserves the downloaded model's 61-joint rig, authored
+texture, hair, hands, and staff, adds a `staff.tip` socket, then authors `Idle`,
+`Walk`, `Chop`, `Cast`, and `Water` actions. The self-contained GLB is embedded
+in the executable and loaded through `ModelAsset`; the application does not
+define a second animation renderer.
 
 The simulation places the player capsule center at `ground + PLAYER_HEIGHT`.
 The presentation transform separately maps the model's authored rest-pose
@@ -115,10 +116,27 @@ minimum Y to the sampled terrain height. **The collision origin stays at the
 capsule center while the rendered feet stay on the ground plane.** Camera focus
 is derived from that visual foot position.
 
-Animation selection is deterministic: an active chop overrides walking, a
-nonzero planar velocity selects walking, and the remaining state selects idle.
-The axe is part of the same skin and is rigidly weighted to `axe.R`, below the
-right hand, so hand, forearm, upper-arm, and axe motion share one sampled pose.
+Animation selection is deterministic: staff strike overrides water casting,
+which overrides ember casting, walking, and idle in that order. The staff is
+part of the same skin and is rigidly weighted to `staff.R`, so hand, forearm,
+upper-arm, and staff motion share one sampled pose.
+
+The walk clip hinges limbs about the character's anatomical left-right world
+axis instead of the source bones' rolled local X axes. Its validation receipt
+requires less than 2 cm lateral foot sweep, at least 40 cm fore-aft travel, and
+a 2.5–5.5 cm vertical hip excursion. Idle additionally requires at least 7 cm
+of foot stagger and constrains the staff grip and tip outside the skirt at a
+grounded downward angle. Water rendering and hit testing both sample the
+animated `staff.R` and `staff.tip` transforms from that same pose. Procedural
+fruit uses meter-scale constants: apples render and collide at a 10 cm
+diameter, independent of tree variation.
+
+Grass tufts are world entities rather than render-only decoration. Their
+moisture, fuel, ignition, heat transfer, charring, dousing, and burnout all use
+the shared reactive solver. The authored recipe varies sphere and capsule
+colliders, and the cross-configuration test requires the same ember energy to
+ignite both. Rendering reads the resulting state to tint scorched vegetation
+and place flames; it does not create a second fire state.
 
 The Pocket3D lighting extension is opt-in. The application enables diffuse
 bands, wrapped light, rim light, warm/cool ambient balance, and distance fog.

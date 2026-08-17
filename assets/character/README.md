@@ -1,38 +1,47 @@
-# Explorer character asset
+# Character assets
 
-`explorer.glb` is the runtime character for Pocket Openworld. It contains one
-skinned `ExplorerMesh`, a 19-bone rig, and the `Idle`, `Walk`, and `Chop`
-animation clips. The axe is rigidly weighted to `axe.R`, which is parented to
-`hand.R`. The rest-pose foot soles sit at Y=0 after glTF export, and the
-character faces -Z.
+## Active local Frieren model
 
-## Regenerate
-
-Blender 5.1 or later is required. The checked-in receipt and byte-identical
-runtime digest were produced with Blender 5.1.2. From this directory, run:
+The local runtime uses `frieren.glb`, derived from dedastore's free
+`frieren (.fbx .blend)` BOOTH download. Obtain the source separately from
+<https://booth.pm/ja/items/5469071>, then run:
 
 ```sh
 /Applications/Blender.app/Contents/MacOS/Blender \
   --background --factory-startup \
-  --python generate_character.py
+  --python assets/character/import_frieren.py -- \
+  --source "/Users/evan/Downloads/friren_1.1/frieren model.blend"
 ```
 
-To write into a separate directory or omit the studio renders:
+The importer preserves the supplied 61-bone skin, body, face, hair, texture,
+and right-hand staff, then adds the `staff.tip` outlet socket. It authors five
+Pocket3D clips:
 
-```sh
-/Applications/Blender.app/Contents/MacOS/Blender \
-  --background --factory-startup \
-  --python generate_character.py -- \
-  --output-dir /tmp/pocket3d-explorer --skip-previews
-```
+- `Idle`: relaxed breathing in an at-ease, staggered-foot stance with the
+  staff grounded outside the skirt.
+- `Walk`: a looping stride with opposed limb motion and a skirt-clear staff
+  carry constraint.
+- `Chop`: a forward staff strike used by the tree-cutting interaction.
+- `Cast`: the `F` ember-casting pose.
+- `Water`: the `Q` water-casting pose.
 
-The generator validates the triangle budget, bone and clip names, rigid skin
-weights, planted-foot error, opposing front/back arm travel during `Walk`, the
-axe blade's outward clearance and forward travel during `Chop`, embedded GLB
-buffers, and a fresh Blender import. It exits nonzero when a contract fails and
-writes the measured values plus the GLB SHA-256 digest to `receipt.json`.
+The left hand remains the `hand.L` pickup socket. The receipt rejects a walk
+whose feet sweep sideways, whose stride lacks fore-aft travel, or whose hips do
+not visibly rise and fall. It also rejects a rigid attention-style Idle pose,
+an Idle staff crossing the skirt silhouette, or a Water pose that does not aim
+the staff forward. The importer embeds the source texture as a glTF PBR base-color
+texture, writes
+`frieren-receipt.json`, and renders six images under `frieren-previews/` for
+visual QA.
 
-The committed studio renders show the exact generated `Idle`, `Walk`, and
-`Chop` poses. `walk-rear.png` and `walk-side.png` verify the walk swing from
-orthogonal directions. `explorer.blend` remains editable;
-`generate_character.py` is the source of truth for reproducible changes.
+The BOOTH page does not state an explicit redistribution license. The source
+and derived GLB are not covered by this repository's MIT license. Keep them in
+this private repository only; do not place them in public repositories,
+releases, packages, or other redistribution channels without separate
+permission and copyright review.
+
+## Original explorer
+
+`generate_character.py`, `explorer.blend`, `explorer.glb`, `receipt.json`, and
+the original previews remain the repository-owned MIT-licensed character
+source. They are no longer loaded by the application.
