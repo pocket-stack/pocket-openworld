@@ -48,6 +48,8 @@ const APPLE_HALF_HEIGHT_M: f32 = 0.055;
 const APPLE_LEAF_SCALE_M: Vec3 = Vec3::new(0.025, 0.06, 0.015);
 const HELD_APPLE_SOCKET_OFFSET: Vec3 = Vec3::new(0.0, 0.035, 0.0);
 const HELD_APPLE_ATTACHMENT_OFFSET: Vec3 = Vec3::new(0.37, 0.05, -0.22);
+const GRASS_INITIAL_FUEL: f32 = 0.24;
+const GRASS_TUFTS_PER_PATCH: u32 = 13;
 const CAMERA_FOCUS_HEIGHT: f32 = 1.15;
 const CAMERA_ORBIT_LIFT: f32 = 1.2;
 const CAMERA_ORBIT_DISTANCE: f32 = 6.0;
@@ -672,7 +674,10 @@ impl WorldAssets {
                 "world apple",
             ),
             leaf: upload(art::cone(1.0, 1.0, 7), "world leaf"),
-            grass: upload(art::grass_tuft_seeded(1.0, 1.0, 7, 0x1177), "world grass"),
+            grass: upload(
+                art::grass_patch_seeded(1.35, 0.82, GRASS_TUFTS_PER_PATCH, 7, 0x1177),
+                "world grass patch",
+            ),
             rock: upload(art::rock(1.0, 0x8118), "world rock"),
             shadow: upload(art::disc(1.0, 28), "world contact shadow"),
             explorer,
@@ -1020,6 +1025,15 @@ impl WorldGame {
             .grass
             .iter()
             .any(|id| self.receipts.ignited.contains(id))
+    }
+
+    pub fn grass_burned_out(&self) -> bool {
+        self.ids.grass.iter().any(|id| {
+            self.world
+                .entity(*id)
+                .and_then(|grass| grass.reactive_state)
+                .is_some_and(|state| state.burned_out)
+        })
     }
 
     pub fn prepare_grass_fire_scenario(&mut self) {
@@ -1592,18 +1606,9 @@ impl WorldGame {
                         continue;
                     };
                     let state = entity.reactive_state.unwrap_or_default();
-                    let scorch = (1.0 - state.fuel)
-                        .max(state.char_progress)
-                        .max(if state.burned_out { 1.0 } else { 0.0 });
-                    let mut tint = mix4(
-                        decoration.tint,
-                        [0.14, 0.09, 0.035, 1.0],
-                        scorch.clamp(0.0, 1.0),
-                    );
-                    if state.burning {
-                        tint = mix4(tint, [0.78, 0.27, 0.025, 1.0], 0.34);
-                    }
-                    (&assets.grass, transform_matrix(entity.transform), tint)
+                    let (transform, tint) =
+                        grass_visual_state(entity.transform, decoration.tint, state);
+                    (&assets.grass, transform_matrix(transform), tint)
                 }
                 DecorationKind::Rock => (&assets.rock, decoration.transform, decoration.tint),
             };
@@ -1938,14 +1943,18 @@ impl WorldGame {
             if !state.burning {
                 continue;
             }
-            let scale = entity
-                .collider
-                .map_or(0.35, Collider::radius)
-                .clamp(0.25, 1.2);
             let grass_fire = entity.has_tag("grass");
-            let flame_count = if entity.has_tag("tree") {
+            let scale = if grass_fire {
+                (entity.transform.scale.max_element() * 0.42).clamp(0.24, 0.38)
+            } else {
+                entity
+                    .collider
+                    .map_or(0.35, Collider::radius)
+                    .clamp(0.25, 1.2)
+            };
+            let flame_count = if entity.has_tag("tree") || grass_fire {
                 5
-            } else if entity.has_tag("fire") || grass_fire {
+            } else if entity.has_tag("fire") {
                 3
             } else {
                 2
@@ -1971,9 +1980,9 @@ impl WorldGame {
                     &assets.flame,
                     Mat4::from_scale_rotation_translation(
                         Vec3::new(
-                            scale * if grass_fire { 0.62 } else { 0.48 } * pulse,
-                            scale * if grass_fire { 3.6 } else { 1.65 },
-                            scale * if grass_fire { 0.62 } else { 0.48 } * pulse,
+                            scale * if grass_fire { 0.55 } else { 0.48 } * pulse,
+                            scale * if grass_fire { 2.4 } else { 1.65 },
+                            scale * if grass_fire { 0.55 } else { 0.48 } * pulse,
                         ),
                         Quat::from_rotation_y(phase),
                         position,
@@ -2320,6 +2329,39 @@ fn grass_material() -> ReactiveMaterial {
     }
 }
 
+fn grass_visual_state(
+    mut transform: Transform,
+    base_tint: [f32; 4],
+    state: ReactiveState,
+) -> (Transform, [f32; 4]) {
+    let consumed = (1.0 - state.fuel / GRASS_INITIAL_FUEL).clamp(0.0, 1.0);
+    let heat = ((state.temperature_c - 65.0) / (grass_material().ignition_temperature_c - 65.0))
+        .clamp(0.0, 1.0);
+    let mut scorch = consumed.max(state.char_progress);
+    if state.charred {
+        scorch = scorch.max(0.82);
+    }
+    if state.burned_out {
+        scorch = 1.0;
+    }
+    let heated = mix4(base_tint, [0.76, 0.49, 0.06, 1.0], heat * 0.72);
+    let mut tint = mix4(heated, [0.035, 0.022, 0.012, 1.0], scorch);
+    if state.burning {
+        tint = mix4(tint, [1.0, 0.18, 0.01, 1.0], 0.58);
+    }
+
+    let collapse = consumed
+        .max(if state.charred { 0.72 } else { 0.0 })
+        .max(if state.burned_out { 1.0 } else { 0.0 });
+    transform.rotation *= Quat::from_rotation_z(collapse * 0.72);
+    transform.scale *= Vec3::new(
+        1.0 - collapse * 0.24,
+        1.0 - collapse * 0.58,
+        1.0 - collapse * 0.24,
+    );
+    (transform, tint)
+}
+
 fn flame_material() -> ReactiveMaterial {
     ReactiveMaterial {
         heat_capacity: 0.25,
@@ -2556,25 +2598,25 @@ fn build_decorations(
             .tagged("grass")
             .tagged("vegetation");
         grass.collider = Some(if index % 2 == 0 {
-            Collider::Sphere { radius: 0.16 }
+            Collider::Sphere { radius: 0.72 }
         } else {
             Collider::CapsuleY {
-                radius: 0.10,
-                half_height: 0.24,
+                radius: 0.58,
+                half_height: 0.32,
             }
         });
         grass.reactive_material = Some(grass_material());
         grass.reactive_state = Some(ReactiveState::new(
             environment.temperature_c,
             0.06 + tint_mix * 0.10,
-            0.24,
+            GRASS_INITIAL_FUEL,
         ));
         let grass_id = world.spawn(grass);
         grass_ids.push(grass_id);
         decorations.push(Decoration {
             kind: DecorationKind::Grass(grass_id),
             transform: Mat4::IDENTITY,
-            tint: mix4([0.24, 0.49, 0.16, 1.0], [0.48, 0.62, 0.20, 1.0], tint_mix),
+            tint: mix4([0.11, 0.35, 0.045, 1.0], [0.32, 0.53, 0.085, 1.0], tint_mix),
         });
     }
     for index in 0..17_u64 {
@@ -2981,8 +3023,19 @@ mod tests {
     #[test]
     fn apple_render_and_collision_scale_match_a_real_world_ten_centimeter_fruit() {
         assert!((APPLE_RADIUS_M * 2.0 - 0.10).abs() < 1e-6);
-        assert!(APPLE_RADIUS_M * 2.0 < PLAYER_HEIGHT * 2.0 * 0.08);
         let game = WorldGame::new(7);
+        let player_height = match game
+            .world
+            .entity(game.ids.player)
+            .and_then(|player| player.collider)
+        {
+            Some(Collider::CapsuleY {
+                radius,
+                half_height,
+            }) => (half_height + radius) * 2.0,
+            collider => panic!("player collider changed: {collider:?}"),
+        };
+        assert!(APPLE_RADIUS_M * 2.0 < player_height * 0.08);
         for apple_id in game.ids.trees.iter().flat_map(|tree| &tree.apples) {
             assert_eq!(
                 game.world
@@ -3046,6 +3099,34 @@ mod tests {
                     .contains(&WorldEvent::Ignited { entity: target })
             );
         }
+    }
+
+    #[test]
+    fn grass_visuals_progress_from_green_to_flame_to_collapsed_char() {
+        let transform = Transform::default();
+        let healthy_tint = [0.32, 0.56, 0.16, 1.0];
+        let fresh = ReactiveState::new(24.0, 0.08, GRASS_INITIAL_FUEL);
+        let (fresh_transform, fresh_color) = grass_visual_state(transform, healthy_tint, fresh);
+        assert_eq!(fresh_transform, transform);
+        assert_eq!(fresh_color, healthy_tint);
+
+        let mut burning = ReactiveState::new(420.0, 0.0, GRASS_INITIAL_FUEL * 0.55);
+        burning.burning = true;
+        burning.char_progress = 0.35;
+        let (burning_transform, burning_color) =
+            grass_visual_state(transform, healthy_tint, burning);
+        assert!(burning_color[0] > fresh_color[0]);
+        assert!(burning_color[1] < fresh_color[1]);
+        assert!(burning_transform.scale.y < fresh_transform.scale.y * 0.8);
+
+        let mut spent = ReactiveState::new(180.0, 0.0, 0.0);
+        spent.char_progress = 1.0;
+        spent.charred = true;
+        spent.burned_out = true;
+        let (spent_transform, spent_color) = grass_visual_state(transform, healthy_tint, spent);
+        assert!(spent_color[0] + spent_color[1] + spent_color[2] < 0.1);
+        assert!(spent_transform.scale.y < fresh_transform.scale.y * 0.5);
+        assert!(spent_transform.rotation != fresh_transform.rotation);
     }
 
     #[test]

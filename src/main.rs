@@ -22,12 +22,14 @@ const SCENARIOS: &[&str] = &[
     "character-carry",
     "character-water",
     "grass-fire",
+    "grass-burnout",
     "campfire-douse",
 ];
 const CHARACTER_CARRY_CAPTURE_TICK: u64 = 360;
 const CHARACTER_CAST_CAPTURE_TICK: u64 = 24;
 const CHARACTER_WATER_CAPTURE_TICK: u64 = 47;
 const GRASS_FIRE_CAPTURE_TICK: u64 = 48;
+const GRASS_BURNOUT_CAPTURE_TICK: u64 = 210;
 
 #[derive(Debug)]
 struct Args {
@@ -107,6 +109,12 @@ fn run_headless(args: Args) -> Result<()> {
             "grass-fire requires --ticks {GRASS_FIRE_CAPTURE_TICK} so the captured frame proves active vegetation combustion"
         );
     }
+    if args.scenario == "grass-burnout" {
+        ensure!(
+            args.ticks == GRASS_BURNOUT_CAPTURE_TICK,
+            "grass-burnout requires --ticks {GRASS_BURNOUT_CAPTURE_TICK} so the captured frame proves persistent collapsed char"
+        );
+    }
     let gpu = Gpu::new_headless()?;
     let mut renderer = Renderer::new(&gpu, OFFSCREEN_FORMAT)?;
     let mut game = WorldGame::new(args.seed);
@@ -114,7 +122,7 @@ fn run_headless(args: Args) -> Result<()> {
     if args.scenario == "campfire-douse" {
         game.prepare_campfire_douse_scenario();
     }
-    if args.scenario == "grass-fire" {
+    if matches!(args.scenario.as_str(), "grass-fire" | "grass-burnout") {
         game.prepare_grass_fire_scenario();
     }
     let mut input = Input::default();
@@ -179,6 +187,12 @@ fn run_headless(args: Args) -> Result<()> {
             "grass-fire acceptance failed: no grass entity reached ignition"
         );
     }
+    if args.scenario == "grass-burnout" {
+        ensure!(
+            game.grass_burned_out(),
+            "grass-burnout acceptance failed: no grass entity retained burned-out char"
+        );
+    }
     if args.scenario == "campfire-douse" {
         ensure!(
             receipt.water.campfire_douse.passed,
@@ -231,7 +245,7 @@ fn parse_args() -> Result<Args> {
             }
             "-h" | "--help" => {
                 println!(
-                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-cast|character-carry|character-water|grass-fire|campfire-douse\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
+                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-cast|character-carry|character-water|grass-fire|grass-burnout|campfire-douse\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
                 );
                 std::process::exit(0);
             }
@@ -285,7 +299,7 @@ fn apply_scenario_script(input: &mut Input, scenario: &str, turn: u64) {
                 input.inject_key(KeyCode::KeyQ, false);
             }
         }
-        "grass-fire" => {
+        "grass-fire" | "grass-burnout" => {
             input.inject_key(KeyCode::KeyF, turn == 1);
             if turn == 2 {
                 input.inject_key(KeyCode::KeyF, false);
@@ -340,6 +354,10 @@ mod tests {
         let mut grass = Input::default();
         apply_scenario_script(&mut grass, "grass-fire", 1);
         assert!(grass.key_down(KeyCode::KeyF));
+
+        let mut spent_grass = Input::default();
+        apply_scenario_script(&mut spent_grass, "grass-burnout", 1);
+        assert!(spent_grass.key_down(KeyCode::KeyF));
 
         let mut campfire = Input::default();
         apply_scenario_script(&mut campfire, "campfire-douse", 120);

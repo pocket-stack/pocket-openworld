@@ -131,12 +131,15 @@ animated `staff.R` and `staff.tip` transforms from that same pose. Procedural
 fruit uses meter-scale constants: apples render and collide at a 10 cm
 diameter, independent of tree variation.
 
-Grass tufts are world entities rather than render-only decoration. Their
+Grass patches are world entities rather than render-only decoration. Their
 moisture, fuel, ignition, heat transfer, charring, dousing, and burnout all use
 the shared reactive solver. The authored recipe varies sphere and capsule
 colliders, and the cross-configuration test requires the same ember energy to
-ignite both. Rendering reads the resulting state to tint scorched vegetation
-and place flames; it does not create a second fire state.
+ignite both. Each entity consolidates thirteen procedural tufts into one mesh
+draw, giving the meadow about two thousand visible tufts while retaining
+roughly the former entity/draw count. Rendering reads the resulting state to
+shift green grass through heated straw and orange combustion into black char,
+and to shrink and lean spent blades; it does not create a second fire state.
 
 The Pocket3D lighting extension is opt-in. The application enables diffuse
 bands, wrapped light, rim light, warm/cool ambient balance, and distance fog.

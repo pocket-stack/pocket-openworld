@@ -122,6 +122,11 @@ cargo run --locked -- \
   --screenshot /tmp/pocket-openworld-grass-fire.png
 
 cargo run --locked -- \
+  --headless --scenario grass-burnout --ticks 210 --size 1440x900 \
+  --receipt /tmp/pocket-openworld-grass-burnout.json \
+  --screenshot /tmp/pocket-openworld-grass-burnout.png
+
+cargo run --locked -- \
   --headless --scenario campfire-douse --ticks 390 --size 1440x900 \
   --receipt /tmp/pocket-openworld-campfire-douse.json
 ```
@@ -130,11 +135,16 @@ cargo run --locked -- \
 checks the five clip names, required joints, skinned primitives, embedded
 texture, triangle budget, animation priority, camera target, foot-to-ground
 transform, hand socket, staff binding, and water corridor. The
-`character-cast`, `character-carry`, `character-water`, and `grass-fire` runs
-also fail if their interaction is not active at the captured frame. Grass
-coverage uses the same reactive simulation for sphere and capsule tuft
-colliders; the test matrix ignites both configurations without tag-specific
-solver branches.
+`character-cast`, `character-carry`, `character-water`, `grass-fire`, and
+`grass-burnout` runs also fail unless their intended live or persistent state
+is present at the captured frame. Grass coverage uses the same reactive
+simulation for sphere and capsule patch colliders; the test matrix ignites
+both configurations without tag-specific solver branches. Each reactive grass
+entity renders a thirteen-tuft meadow
+patch as one consolidated model draw, so the world contains about two thousand
+visible tufts without multiplying draw calls by thirteen. Fresh, burning,
+charred, and burned-out states visibly progress from green to orange flame,
+then dark, collapsed vegetation.
 
 `campfire-douse` places the character at close range without changing the world
 material rules, waits for the two ordinary logs to ignite, and sends one
