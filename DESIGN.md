@@ -122,11 +122,17 @@ part of the same skin and is rigidly weighted to `staff.R`, so hand, forearm,
 upper-arm, and staff motion share one sampled pose.
 
 The walk clip hinges limbs about the character's anatomical left-right world
-axis instead of the source bones' rolled local X axes. Its validation receipt
-requires less than 2 cm lateral foot sweep, at least 40 cm fore-aft travel, and
-a 2.5–5.5 cm vertical hip excursion. Idle additionally requires at least 7 cm
-of foot stagger and constrains the staff grip and tip outside the skirt at a
-grounded downward angle. Water rendering and hit testing both sample the
+axis instead of the source bones' rolled local X axes. Its eight contact,
+down, passing, and up poses add foot roll, support-side pelvis translation,
+pelvis yaw/roll, articulated spine compression, shoulder counter-rotation, and
+restrained head compensation. Both arms swing opposite their corresponding
+legs, with elbow flex and a reduced staff-side arc. The validation receipt
+requires at least 40 cm fore-aft foot travel, 20 cm fore-aft hand travel on
+each side, 2.5–5.5 cm vertical and 2.5–4.5 cm lateral hip travel, upper-body
+response in three axes, and 6–12 degrees of shoulder-versus-pelvis
+counter-twist. Idle additionally requires at least 7 cm of foot stagger and
+constrains the staff grip and tip outside the skirt at a grounded downward
+angle. Water rendering and hit testing both sample the
 animated `staff.R` and `staff.tip` transforms from that same pose. Procedural
 fruit uses meter-scale constants: apples render and collide at a 10 cm
 diameter, independent of tree variation.

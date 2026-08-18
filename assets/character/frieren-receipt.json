@@ -42,23 +42,31 @@
       "lateral": "+X",
       "up": "+Z"
     },
-    "hips_vertical_range_m": 0.035,
+    "head_relative_forward_range_m": 0.0072,
+    "head_relative_lateral_range_m": 0.0115,
+    "head_vertical_range_m": 0.03155,
+    "hips_lateral_range_m": 0.036,
+    "hips_vertical_range_m": 0.032,
     "idle_foot_stagger_m": 0.09916,
     "idle_staff_grip_lateral_m": 0.25421,
     "idle_staff_tip_height_m": 0.08286,
     "idle_staff_vertical_slope": -0.63949,
-    "left_foot_forward_range_m": 0.57518,
-    "left_foot_lateral_range_m": 0.00278,
-    "right_foot_forward_range_m": 0.56447,
-    "right_foot_lateral_range_m": 0.00277,
+    "left_foot_forward_range_m": 0.55939,
+    "left_foot_lateral_range_m": 0.03738,
+    "left_hand_forward_range_m": 0.40919,
+    "right_foot_forward_range_m": 0.55449,
+    "right_foot_lateral_range_m": 0.03613,
+    "right_hand_forward_range_m": 0.34358,
+    "shoulder_counter_roll_range_deg": 5.19931,
+    "shoulder_counter_twist_range_deg": 8.06322,
     "water_staff_forward_alignment": 0.99265,
     "water_staff_tip_height_m": 1.00271,
     "water_staff_vertical_slope": -0.04415
   },
   "output": {
-    "bytes": 794224,
+    "bytes": 798668,
     "glb": "frieren.glb",
-    "sha256": "cbb61e793766f577728fa391620636b601e74c70ac98be9acb292c054cae5746"
+    "sha256": "2259d71efb027ad05510b83df83a60a558e723583f13297565c0090dd6c7376c"
   },
   "rig": {
     "bones": 62,

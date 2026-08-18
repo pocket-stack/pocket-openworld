@@ -61,7 +61,7 @@ The receipt proves simulation state; the PNG proves the rendered result.
 ## Character asset
 
 The complete derived runtime asset is checked into this repository. A fresh
-clone receives `assets/character/frieren.glb`, its six QA previews, the
+clone receives `assets/character/frieren.glb`, its nine QA previews, the
 machine-readable receipt, and the importer; normal builds do not need Blender,
 a BOOTH account, or the original `.blend` file.
 
@@ -71,13 +71,15 @@ adds one staff-tip socket. The runtime selects five named glTF clips:
 
 - `Idle` is a looping at-ease stance with staggered feet and the staff resting
   outside the skirt silhouette.
-- `Walk` is a looping stride with opposing arm motion.
+- `Walk` is an eight-phase game-style stride with planted-foot compression,
+  lateral weight transfer, pelvis rotation, counter-rotating shoulders,
+  contralateral arm swing with elbow flex, and head stabilization.
 - `Chop` is a non-looping staff strike and recovery.
 - `Cast` is selected by the `F` ember action.
 - `Water` is selected by the `Q` water action.
 
 To reproduce or modify the derived files, first obtain the source model from
-BOOTH and regenerate the embedded runtime GLB, six studio previews, and
+BOOTH and regenerate the embedded runtime GLB, nine studio previews, and
 machine-readable validation receipt with:
 
 ```sh

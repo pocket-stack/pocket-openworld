@@ -25,20 +25,24 @@ Pocket3D clips:
 
 - `Idle`: relaxed breathing in an at-ease, staggered-foot stance with the
   staff grounded outside the skirt.
-- `Walk`: a looping stride with opposed limb motion and a skirt-clear staff
-  carry constraint.
+- `Walk`: an eight-phase contact/down/passing/up stride with foot roll, pelvis
+  weight transfer, articulated spine and shoulder counter-rotation,
+  contralateral arm swing with elbow flex, restrained head compensation, and a
+  skirt-clear staff carry constraint.
 - `Chop`: a forward staff strike used by the tree-cutting interaction.
 - `Cast`: the `F` ember-casting pose.
 - `Water`: the `Q` water-casting pose.
 
 The left hand remains the `hand.L` pickup socket. The receipt rejects a walk
-whose feet sweep sideways, whose stride lacks fore-aft travel, or whose hips do
-not visibly rise and fall. It also rejects a rigid attention-style Idle pose,
-an Idle staff crossing the skirt silhouette, or a Water pose that does not aim
-the staff forward. The importer embeds the source texture as a glTF PBR base-color
-texture, writes
-`frieren-receipt.json`, and renders six images under `frieren-previews/` for
-visual QA.
+whose feet drift beyond the authored weight transfer, whose stride lacks
+fore-aft travel, whose pelvis does not shift between support legs, or whose
+upper body lacks vertical response, torso compression, lateral counter-balance,
+shoulder counter-rotation, or measurable hand travel on either side. It also
+rejects a rigid attention-style Idle pose, an Idle staff crossing the skirt
+silhouette, or a Water pose that does not aim the staff forward. The importer
+embeds the source texture as a glTF PBR base-color texture, writes
+`frieren-receipt.json`, and renders nine images under
+`frieren-previews/` for visual QA.
 
 The BOOTH page does not state an explicit redistribution license. The source
 and derived GLB are not covered by this repository's MIT license. Keep them in

@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Euler, Matrix, Quaternion, Vector
 
 
 HERE = Path(__file__).resolve().parent
@@ -242,6 +242,28 @@ def world_axis_rotation(armature, bone_name, world_axis, angle):
     return Quaternion(local_axis.normalized(), angle).to_euler("XYZ")
 
 
+def world_axes_rotation(armature, bone_name, rotations):
+    """Compose small rotations about stable world axes into one pose rotation."""
+    bone = armature.data.bones[bone_name]
+    rest_basis = armature.matrix_world.to_3x3() @ bone.matrix_local.to_3x3()
+    result = Quaternion()
+    for world_axis, angle in rotations:
+        local_axis = rest_basis.inverted() @ Vector(world_axis)
+        result = Quaternion(local_axis.normalized(), angle) @ result
+    return result.to_euler("XYZ")
+
+
+def pose_with_world_axes(armature, bone_name, base_euler, rotations):
+    """Pre-multiply world-axis motion onto an authored local resting pose."""
+    bone = armature.data.bones[bone_name]
+    rest_basis = armature.matrix_world.to_3x3() @ bone.matrix_local.to_3x3()
+    result = Euler(base_euler, "XYZ").to_quaternion()
+    for world_axis, angle in rotations:
+        local_axis = rest_basis.inverted() @ Vector(world_axis)
+        result = Quaternion(local_axis.normalized(), angle) @ result
+    return result.to_euler("XYZ")
+
+
 def resting_pose(armature, breath=0.0):
     """Relaxed at-ease upper body with the staff clear of the skirt."""
     return relaxed_pose(breath)
@@ -275,43 +297,129 @@ def create_actions(armature):
         )
 
     walk = begin_action(armature, "Walk", True)
-    # Every limb hinges around Blender world X, the character's anatomical
-    # left-right axis. The source bones have mirrored/non-zero rolls, so
-    # writing a raw local-X Euler makes the feet sweep sideways.
+    # A conventional game walk uses contact, down, passing, and up poses for
+    # each side. Limbs hinge around Blender world X (the anatomical lateral
+    # axis), while the pelvis transfers weight over the stance foot and the
+    # spine/shoulders counter-rotate so the torso never travels as one rigid
+    # floating block. Values are radians except the Hips translations, whose
+    # source-rig units become centimetres through the armature's 0.01 scale.
     walk_frames = (
-        # frame, hip L/R, knee L/R, arm L/R, root vertical offset (cm)
-        (1, -0.38, 0.34, 0.10, 0.20, 0.30, -0.30, -2.0),
-        (9, 0.10, -0.05, 0.08, 0.62, -0.08, 0.08, 1.5),
-        (17, 0.34, -0.38, 0.20, 0.10, -0.30, 0.30, -2.0),
-        (25, -0.05, 0.10, 0.62, 0.08, 0.08, -0.08, 1.5),
-        (33, -0.38, 0.34, 0.10, 0.20, 0.30, -0.30, -2.0),
+        # frame, leg L/R, knee L/R, foot roll L/R, arm L/R, elbow L/R,
+        # hip x/y/z, pelvis yaw/roll, torso compression (degrees)
+        (1, -0.38, 0.34, 0.10, 0.20, 0.12, -0.14, 0.48, -0.42, -0.05, 0.22, 0.0, 0.0, -0.25, 3.2, 0.0, 0.5),
+        (5, -0.24, 0.23, 0.24, 0.38, 0.04, -0.20, 0.32, -0.30, -0.07, 0.18, 1.25, -1.6, 0.20, 2.1, 1.7, 2.2),
+        (9, 0.10, -0.05, 0.08, 0.62, -0.05, 0.10, 0.05, -0.05, -0.12, 0.12, 1.80, -0.8, 0.0, 0.0, 2.6, 0.0),
+        (13, 0.26, -0.26, 0.12, 0.34, -0.10, 0.05, -0.32, 0.30, -0.18, 0.07, 1.10, 1.6, -0.18, -2.0, 1.5, -0.8),
+        (17, 0.34, -0.38, 0.20, 0.10, -0.14, 0.12, -0.48, 0.42, -0.22, 0.05, 0.0, 0.0, -0.25, -3.2, 0.0, 0.5),
+        (21, 0.23, -0.24, 0.38, 0.24, -0.20, 0.04, -0.32, 0.30, -0.18, 0.07, -1.25, -1.6, 0.20, -2.1, -1.7, 2.2),
+        (25, -0.05, 0.10, 0.62, 0.08, 0.10, -0.05, -0.05, 0.05, -0.12, 0.12, -1.80, -0.8, 0.0, 0.0, -2.6, 0.0),
+        (29, -0.26, 0.26, 0.34, 0.12, 0.05, -0.10, 0.32, -0.30, -0.07, 0.18, -1.10, 1.6, -0.18, 2.0, -1.5, -0.8),
+        (33, -0.38, 0.34, 0.10, 0.20, 0.12, -0.14, 0.48, -0.42, -0.05, 0.22, 0.0, 0.0, -0.25, 3.2, 0.0, 0.5),
     )
-    for frame, left_leg, right_leg, left_knee, right_knee, left_arm, right_arm, bob in walk_frames:
+    for (
+        frame,
+        left_leg,
+        right_leg,
+        left_knee,
+        right_knee,
+        left_foot_roll,
+        right_foot_roll,
+        left_arm,
+        right_arm,
+        left_elbow,
+        right_elbow,
+        hip_lateral,
+        hip_vertical,
+        hip_forward,
+        pelvis_yaw,
+        pelvis_roll,
+        compression,
+    ) in walk_frames:
+        pelvis_yaw = math.radians(pelvis_yaw)
+        pelvis_roll = math.radians(pelvis_roll)
+        compression = math.radians(compression)
+        rest = resting_pose(armature, 0.0)
         rotations = merged(
-            resting_pose(armature, 0.0),
+            rest,
             {
+                "Hips": world_axes_rotation(
+                    armature,
+                    "Hips",
+                    (
+                        ((1, 0, 0), math.radians(0.8) + compression * 0.16),
+                        ((0, 1, 0), pelvis_roll),
+                        ((0, 0, 1), pelvis_yaw),
+                    ),
+                ),
                 "leg.L": world_axis_rotation(armature, "leg.L", (1, 0, 0), left_leg),
                 "knee.L": world_axis_rotation(armature, "knee.L", (1, 0, 0), left_knee),
                 "foot.L": world_axis_rotation(
-                    armature, "foot.L", (1, 0, 0), -(left_leg + left_knee)
+                    armature,
+                    "foot.L",
+                    (1, 0, 0),
+                    -(left_leg + left_knee) + left_foot_roll,
                 ),
                 "leg.R": world_axis_rotation(armature, "leg.R", (1, 0, 0), right_leg),
                 "knee.R": world_axis_rotation(armature, "knee.R", (1, 0, 0), right_knee),
                 "foot.R": world_axis_rotation(
-                    armature, "foot.R", (1, 0, 0), -(right_leg + right_knee)
+                    armature,
+                    "foot.R",
+                    (1, 0, 0),
+                    -(right_leg + right_knee) + right_foot_roll,
                 ),
-                "Arm.L": world_axis_rotation(armature, "Arm.L", (1, 0, 0), left_arm),
-                "Arm.R": world_axis_rotation(armature, "Arm.R", (1, 0, 0), right_arm),
-                "Spine2": (0.0, 0.0, (left_leg - right_leg) * 0.025),
+                "foreArm.L": (0.0, 0.0, left_elbow),
+                "foreArm.R": (0.0, 0.0, right_elbow),
+                "hand.L": (0.0, 0.0, -left_arm * 0.10),
+                "hand.R": (0.0, 0.0, -right_arm * 0.08),
+                "Spine": world_axes_rotation(
+                    armature,
+                    "Spine",
+                    (
+                        ((1, 0, 0), math.radians(-1.8) + compression * 0.48),
+                        ((0, 1, 0), -pelvis_roll * 0.48),
+                        ((0, 0, 1), -pelvis_yaw * 0.34),
+                    ),
+                ),
+                "Spine1": world_axes_rotation(
+                    armature,
+                    "Spine1",
+                    (
+                        ((1, 0, 0), -compression * 0.22),
+                        ((0, 1, 0), -pelvis_roll * 0.32),
+                        ((0, 0, 1), -pelvis_yaw * 0.28),
+                    ),
+                ),
+                "Spine2": world_axes_rotation(
+                    armature,
+                    "Spine2",
+                    (
+                        ((1, 0, 0), -compression * 0.18),
+                        ((0, 1, 0), -pelvis_roll * 0.20),
+                        ((0, 0, 1), -pelvis_yaw * 0.64),
+                    ),
+                ),
+                "Head": world_axes_rotation(
+                    armature,
+                    "Head",
+                    (
+                        ((1, 0, 0), -compression * 0.34),
+                        ((0, 1, 0), pelvis_roll * 0.20),
+                        ((0, 0, 1), pelvis_yaw * 0.18),
+                    ),
+                ),
             },
         )
-        # Hips local Y maps to world vertical. A 3.5 cm excursion makes weight
-        # transfer readable while keeping the authored foot plane grounded.
+        rotations["Arm.L"] = pose_with_world_axes(
+            armature, "Arm.L", rest["Arm.L"], (((1, 0, 0), left_arm),)
+        )
+        rotations["Arm.R"] = pose_with_world_axes(
+            armature, "Arm.R", rest["Arm.R"], (((1, 0, 0), right_arm),)
+        )
         key_pose(
             armature,
             frame,
             rotations,
-            {"Hips": (0.0, bob, 0.0)},
+            {"Hips": (hip_lateral, hip_vertical, hip_forward)},
             staff_direction=(-0.12, -0.76, -0.64),
         )
 
@@ -476,17 +584,48 @@ def motion_metrics(armature, actions):
     samples = []
     for frame in range(1, 34):
         scene.frame_set(frame)
+        hips = point("Hips")
+        head = point("Head")
+        left_shoulder = point("Arm.L")
+        right_shoulder = point("Arm.R")
+        left_hand = point("hand.L")
+        right_hand = point("hand.R")
+        shoulder_axis = left_shoulder - right_shoulder
+        hips_axis = (
+            armature.matrix_world.to_3x3()
+            @ armature.pose.bones["Hips"].matrix.to_3x3()
+            @ Vector((1.0, 0.0, 0.0))
+        )
+        shoulder_yaw = math.atan2(shoulder_axis.y, shoulder_axis.x)
+        hips_yaw = math.atan2(hips_axis.y, hips_axis.x)
+        counter_twist = (shoulder_yaw - hips_yaw + math.pi) % (2.0 * math.pi) - math.pi
+        shoulder_roll = math.atan2(
+            shoulder_axis.z, Vector((shoulder_axis.x, shoulder_axis.y)).length
+        )
+        hips_roll = math.atan2(hips_axis.z, Vector((hips_axis.x, hips_axis.y)).length)
+        counter_roll = shoulder_roll - hips_roll
         samples.append(
             {
                 "frame": frame,
-                "hips": point("Hips"),
+                "hips": hips,
+                "head": head,
                 "left_foot": point("foot.L"),
                 "right_foot": point("foot.R"),
+                "head_relative_lateral": head.x - hips.x,
+                "head_relative_forward": head.y - hips.y,
+                "left_hand_relative_forward": left_hand.y - left_shoulder.y,
+                "right_hand_relative_forward": right_hand.y - right_shoulder.y,
+                "shoulder_counter_roll_deg": math.degrees(counter_roll),
+                "shoulder_counter_twist_deg": math.degrees(counter_twist),
             }
         )
 
     def axis_range(key, axis):
         values = [sample[key][axis] for sample in samples]
+        return max(values) - min(values)
+
+    def scalar_range(key):
+        values = [sample[key] for sample in samples]
         return max(values) - min(values)
 
     result = {
@@ -495,14 +634,36 @@ def motion_metrics(armature, actions):
         "left_foot_forward_range_m": axis_range("left_foot", 1),
         "right_foot_lateral_range_m": axis_range("right_foot", 0),
         "right_foot_forward_range_m": axis_range("right_foot", 1),
+        "hips_lateral_range_m": axis_range("hips", 0),
         "hips_vertical_range_m": axis_range("hips", 2),
+        "head_vertical_range_m": axis_range("head", 2),
+        "head_relative_lateral_range_m": scalar_range("head_relative_lateral"),
+        "head_relative_forward_range_m": scalar_range("head_relative_forward"),
+        "left_hand_forward_range_m": scalar_range("left_hand_relative_forward"),
+        "right_hand_forward_range_m": scalar_range("right_hand_relative_forward"),
+        "shoulder_counter_roll_range_deg": scalar_range("shoulder_counter_roll_deg"),
+        "shoulder_counter_twist_range_deg": scalar_range("shoulder_counter_twist_deg"),
     }
-    if max(result["left_foot_lateral_range_m"], result["right_foot_lateral_range_m"]) > 0.02:
-        raise RuntimeError(f"walk feet sweep sideways: {result}")
+    if max(result["left_foot_lateral_range_m"], result["right_foot_lateral_range_m"]) > 0.045:
+        raise RuntimeError(f"walk feet drift wider than the authored weight transfer: {result}")
     if min(result["left_foot_forward_range_m"], result["right_foot_forward_range_m"]) < 0.40:
         raise RuntimeError(f"walk stride has no readable fore-aft travel: {result}")
     if not 0.025 <= result["hips_vertical_range_m"] <= 0.055:
         raise RuntimeError(f"walk center-of-mass excursion is implausible: {result}")
+    if not 0.025 <= result["hips_lateral_range_m"] <= 0.045:
+        raise RuntimeError(f"walk pelvis does not transfer weight between support legs: {result}")
+    if not 0.025 <= result["head_vertical_range_m"] <= 0.050:
+        raise RuntimeError(f"walk upper body does not respond to footfall height: {result}")
+    if not 0.008 <= result["head_relative_lateral_range_m"] <= 0.030:
+        raise RuntimeError(f"walk torso has no readable counter-balance: {result}")
+    if result["head_relative_forward_range_m"] < 0.005:
+        raise RuntimeError(f"walk torso has no compression and recovery: {result}")
+    if min(result["left_hand_forward_range_m"], result["right_hand_forward_range_m"]) < 0.20:
+        raise RuntimeError(f"walk arms have no readable fore-aft swing: {result}")
+    if not 5.0 <= result["shoulder_counter_roll_range_deg"] <= 10.0:
+        raise RuntimeError(f"walk shoulders do not counter-tilt against the pelvis: {result}")
+    if not 6.0 <= result["shoulder_counter_twist_range_deg"] <= 12.0:
+        raise RuntimeError(f"walk shoulders do not counter-rotate against the pelvis: {result}")
 
     armature.animation_data.action = actions["Idle"]
     scene.frame_set(24)
@@ -640,7 +801,10 @@ def render_previews(armature, meshes, actions):
     views = (
         ("idle-front", "Idle", 24, (3.0, -5.1, 2.45)),
         ("idle-rear", "Idle", 24, (0.0, 5.4, 2.15)),
-        ("walk-side", "Walk", 1, (5.4, 0.0, 2.15)),
+        ("walk-side", "Walk", 33, (5.4, 0.0, 2.15)),
+        ("walk-down-front", "Walk", 5, (3.0, -5.1, 2.45)),
+        ("walk-passing-front", "Walk", 9, (3.0, -5.1, 2.45)),
+        ("walk-up-side", "Walk", 13, (5.4, 0.0, 2.15)),
         ("chop", "Chop", 22, (3.0, -5.1, 2.45)),
         ("cast", "Cast", 12, (3.0, -5.1, 2.45)),
         ("water", "Water", 12, (3.0, -5.1, 2.45)),
