@@ -74,9 +74,8 @@ adds one staff-tip socket. The runtime selects five named glTF clips:
 - `Walk` is an eight-phase game-style stride with planted-foot compression,
   heel strike, toe-off, swing-foot clearance, planted-foot grounding, lateral
   weight transfer, pelvis rotation, counter-rotating shoulders, contralateral
-  arm swing with elbow flex, a relaxed free hand, a thumb-opposed staff grip
-  that stays closed during the arm swing, head stabilization, and footfall
-  phase tied to actual distance travelled.
+  arm swing with elbow flex, head stabilization, and footfall phase tied to
+  actual distance travelled.
 - `Chop` is a non-looping staff strike and recovery.
 - `Cast` is selected by the `F` ember action.
 - `Water` is selected by the `Q` water action.
