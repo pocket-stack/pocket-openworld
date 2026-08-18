@@ -417,7 +417,7 @@ def create_actions(armature, meshes):
         # Loading increases that lean and the up pose recovers some of it;
         # distribute the bend through the lumbar and thoracic chain instead of
         # rotating the torso as one rigid board.
-        forward_lean = math.radians(13.0) + compression * 0.35
+        forward_lean = math.radians(12.0) + compression * 0.35
         rest = resting_pose(armature, 0.0)
         rotations = merged(
             rest,
