@@ -627,6 +627,47 @@ pub fn grass_tuft_seeded(radius: f32, height: f32, blades: u32, seed: u64) -> Me
     builder.build()
 }
 
+/// A meadow-sized clump consolidated into one mesh/model draw. Each tuft is
+/// still recognizable at close range, while callers can place one reactive
+/// entity per patch instead of paying one draw per tuft.
+pub fn grass_patch_seeded(
+    radius: f32,
+    height: f32,
+    tufts: u32,
+    blades_per_tuft: u32,
+    seed: u64,
+) -> Mesh {
+    assert!(
+        radius > 0.0 && height > 0.0,
+        "grass patch dimensions must be positive"
+    );
+    let tufts = tufts.max(3);
+    let geometry_count = (tufts * blades_per_tuft.max(3) * 18) as usize;
+    let mut patch = MeshBuilder::with_capacity(geometry_count, geometry_count);
+    let golden_angle = PI * (3.0 - 5.0_f32.sqrt());
+    for tuft in 0..tufts {
+        let spread = ((tuft as f32 + 0.5) / tufts as f32).sqrt();
+        let jitter = hash01(seed ^ 0xa471, tuft as u64 * 4 + 1);
+        let angle = tuft as f32 * golden_angle + (jitter - 0.5) * 0.7;
+        let local_radius = radius * spread * (0.72 + jitter * 0.12);
+        let (sin, cos) = angle.sin_cos();
+        let tuft_radius = radius * (0.16 + hash01(seed ^ 0xa472, tuft as u64 * 4 + 2) * 0.05);
+        let tuft_height = height * (0.72 + hash01(seed ^ 0xa473, tuft as u64 * 4 + 3) * 0.36);
+        let mesh = grass_tuft_seeded(
+            tuft_radius,
+            tuft_height,
+            blades_per_tuft,
+            seed ^ (tuft as u64).wrapping_mul(0x9e37_79b9),
+        );
+        patch.append(
+            &mesh,
+            Mat4::from_translation(Vec3::new(cos * local_radius, 0.0, sin * local_radius))
+                * Mat4::from_rotation_y(angle * 0.37),
+        );
+    }
+    patch.build()
+}
+
 /// A grounded, flat-shaded rock with deterministic asymmetry.
 pub fn rock(radius: f32, seed: u64) -> Mesh {
     let mut mesh = irregular_icosphere(radius, 1, seed, 0.28);
@@ -909,12 +950,24 @@ mod tests {
             cone(0.4, 1.2, 12),
             rock(0.8, 7),
             grass_tuft_seeded(0.5, 0.9, 7, 11),
+            grass_patch_seeded(1.35, 0.82, 13, 7, 12),
         ] {
             assert_valid(&mesh);
             assert_front_faces_match_vertex_normals(&mesh);
             let (min, _) = mesh.bounds().unwrap();
             assert!(min.y >= -1.0e-5);
         }
+    }
+
+    #[test]
+    fn grass_patch_batches_many_grounded_tufts_into_one_mesh() {
+        let patch = grass_patch_seeded(1.35, 0.82, 13, 7, 12);
+        assert_valid(&patch);
+        assert_eq!(patch.triangle_count(), 13 * 7 * 6);
+        let (min, max) = patch.bounds().unwrap();
+        assert!(min.y >= -1.0e-5);
+        assert!(max.y > 0.6 && max.y < 1.0);
+        assert!(max.x.max(max.z) > 0.8);
     }
 
     #[test]
