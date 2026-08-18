@@ -42,9 +42,9 @@
       "lateral": "+X",
       "up": "+Z"
     },
-    "head_relative_forward_range_m": 0.0072,
-    "head_relative_lateral_range_m": 0.0115,
-    "head_vertical_range_m": 0.02836,
+    "head_relative_forward_range_m": 0.02622,
+    "head_relative_lateral_range_m": 0.01179,
+    "head_vertical_range_m": 0.02999,
     "hips_lateral_range_m": 0.036,
     "hips_vertical_range_m": 0.02851,
     "idle_foot_stagger_m": 0.09916,
@@ -54,14 +54,17 @@
     "left_ankle_pitch_range_deg": 50.41205,
     "left_foot_forward_range_m": 0.55939,
     "left_foot_lateral_range_m": 0.03738,
-    "left_hand_forward_range_m": 0.40919,
+    "left_hand_forward_range_m": 0.40359,
     "right_ankle_pitch_range_deg": 51.92612,
     "right_foot_forward_range_m": 0.55449,
     "right_foot_lateral_range_m": 0.03613,
-    "right_hand_forward_range_m": 0.34358,
-    "shoulder_counter_roll_range_deg": 5.19931,
-    "shoulder_counter_twist_range_deg": 8.06322,
+    "right_hand_forward_range_m": 0.33778,
+    "shoulder_counter_roll_range_deg": 5.15375,
+    "shoulder_counter_twist_range_deg": 7.93149,
     "support_sole_max_error_m": 0.0,
+    "torso_forward_lean_max_deg": 7.94363,
+    "torso_forward_lean_min_deg": 4.68914,
+    "torso_forward_lean_range_deg": 3.2545,
     "water_staff_forward_alignment": 0.99265,
     "water_staff_tip_height_m": 1.00271,
     "water_staff_vertical_slope": -0.04415
@@ -69,7 +72,7 @@
   "output": {
     "bytes": 1227860,
     "glb": "frieren.glb",
-    "sha256": "736effd086500ec000377cb1a10cccfbbbf3f01b8d3351477793f9e0b5528b40"
+    "sha256": "fd92ac60ab05755d6393a9968f76ae58d1fbeafffc870d19f66ba686ccabea24"
   },
   "rig": {
     "bones": 62,

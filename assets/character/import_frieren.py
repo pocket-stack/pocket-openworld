@@ -413,6 +413,11 @@ def create_actions(armature, meshes):
         pelvis_yaw = math.radians(pelvis_yaw)
         pelvis_roll = math.radians(pelvis_roll)
         compression = math.radians(compression)
+        # A relaxed walk carries the ribcage slightly ahead of the pelvis.
+        # Loading increases that lean and the up pose recovers some of it;
+        # distribute the bend through the lumbar and thoracic chain instead of
+        # rotating the torso as one rigid board.
+        forward_lean = math.radians(13.0) + compression * 0.35
         rest = resting_pose(armature, 0.0)
         rotations = merged(
             rest,
@@ -450,7 +455,12 @@ def create_actions(armature, meshes):
                     armature,
                     "Spine",
                     (
-                        ((1, 0, 0), math.radians(-1.8) + compression * 0.48),
+                        (
+                            (1, 0, 0),
+                            math.radians(-1.8)
+                            + forward_lean * 0.80
+                            + compression * 0.75,
+                        ),
                         ((0, 1, 0), -pelvis_roll * 0.48),
                         ((0, 0, 1), -pelvis_yaw * 0.34),
                     ),
@@ -459,7 +469,10 @@ def create_actions(armature, meshes):
                     armature,
                     "Spine1",
                     (
-                        ((1, 0, 0), -compression * 0.22),
+                        (
+                            (1, 0, 0),
+                            forward_lean * 0.22 + compression * 0.25,
+                        ),
                         ((0, 1, 0), -pelvis_roll * 0.32),
                         ((0, 0, 1), -pelvis_yaw * 0.28),
                     ),
@@ -468,7 +481,10 @@ def create_actions(armature, meshes):
                     armature,
                     "Spine2",
                     (
-                        ((1, 0, 0), -compression * 0.18),
+                        (
+                            (1, 0, 0),
+                            -forward_lean * 0.02 - compression * 0.18,
+                        ),
                         ((0, 1, 0), -pelvis_roll * 0.20),
                         ((0, 0, 1), -pelvis_yaw * 0.64),
                     ),
@@ -477,7 +493,10 @@ def create_actions(armature, meshes):
                     armature,
                     "Head",
                     (
-                        ((1, 0, 0), -compression * 0.34),
+                        (
+                            (1, 0, 0),
+                            -forward_lean * 0.28 - compression * 0.55,
+                        ),
                         ((0, 1, 0), pelvis_roll * 0.20),
                         ((0, 0, 1), pelvis_yaw * 0.18),
                     ),
@@ -671,6 +690,9 @@ def motion_metrics(armature, meshes, actions):
         right_shoulder = point("Arm.R")
         left_hand = point("hand.L")
         right_hand = point("hand.R")
+        shoulder_center = (left_shoulder + right_shoulder) * 0.5
+        torso_axis = shoulder_center - hips
+        torso_forward_lean = math.degrees(math.atan2(-torso_axis.y, torso_axis.z))
         shoulder_axis = left_shoulder - right_shoulder
         hips_axis = (
             armature.matrix_world.to_3x3()
@@ -698,6 +720,7 @@ def motion_metrics(armature, meshes, actions):
                 "head_relative_forward": head.y - hips.y,
                 "left_hand_relative_forward": left_hand.y - left_shoulder.y,
                 "right_hand_relative_forward": right_hand.y - right_shoulder.y,
+                "torso_forward_lean_deg": torso_forward_lean,
                 "shoulder_counter_roll_deg": math.degrees(counter_roll),
                 "shoulder_counter_twist_deg": math.degrees(counter_twist),
                 "sole_heights": deformed_sole_heights(armature, meshes),
@@ -727,6 +750,13 @@ def motion_metrics(armature, meshes, actions):
         "head_relative_forward_range_m": scalar_range("head_relative_forward"),
         "left_hand_forward_range_m": scalar_range("left_hand_relative_forward"),
         "right_hand_forward_range_m": scalar_range("right_hand_relative_forward"),
+        "torso_forward_lean_min_deg": min(
+            sample["torso_forward_lean_deg"] for sample in samples
+        ),
+        "torso_forward_lean_max_deg": max(
+            sample["torso_forward_lean_deg"] for sample in samples
+        ),
+        "torso_forward_lean_range_deg": scalar_range("torso_forward_lean_deg"),
         "shoulder_counter_roll_range_deg": scalar_range("shoulder_counter_roll_deg"),
         "shoulder_counter_twist_range_deg": scalar_range("shoulder_counter_twist_deg"),
         "support_sole_max_error_m": max(
@@ -753,6 +783,12 @@ def motion_metrics(armature, meshes, actions):
         raise RuntimeError(f"walk torso has no compression and recovery: {result}")
     if min(result["left_hand_forward_range_m"], result["right_hand_forward_range_m"]) < 0.20:
         raise RuntimeError(f"walk arms have no readable fore-aft swing: {result}")
+    if not 3.0 <= result["torso_forward_lean_min_deg"] <= 7.0:
+        raise RuntimeError(f"walk torso returns to a rigid upright posture: {result}")
+    if not 6.0 <= result["torso_forward_lean_max_deg"] <= 10.0:
+        raise RuntimeError(f"walk torso loading lean is implausible: {result}")
+    if result["torso_forward_lean_range_deg"] < 2.0:
+        raise RuntimeError(f"walk spine has no flexion and recovery: {result}")
     if not 5.0 <= result["shoulder_counter_roll_range_deg"] <= 10.0:
         raise RuntimeError(f"walk shoulders do not counter-tilt against the pelvis: {result}")
     if not 6.0 <= result["shoulder_counter_twist_range_deg"] <= 12.0:

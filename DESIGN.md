@@ -127,17 +127,19 @@ down, passing, and up poses move each ankle through heel strike, planted
 loading, toe-off, and dorsiflexed swing clearance. Each authored support pose
 measures the four-weight skinned boot and adjusts the pelvis until its sole
 meets the ground plane. The poses also add support-side pelvis translation,
-pelvis yaw/roll, articulated spine compression, shoulder counter-rotation, and
-restrained head compensation. Both arms swing opposite their corresponding
-legs, with elbow flex and a reduced staff-side arc. Runtime walk phase advances
-from actual horizontal displacement at 2.75 radians per metre, so collision,
-terrain, and boundary corrections cannot leave the feet cycling faster than
-the player moves. The validation receipt requires at least 40 cm fore-aft foot travel,
-35 degrees of ankle pitch travel, support-sole error below 6 mm, 20 cm
-fore-aft hand travel on each side, 2.5–5.5 cm vertical and 2.5–4.5 cm lateral
-hip travel, upper-body response in three axes, and 6–12 degrees of
-shoulder-versus-pelvis counter-twist. Idle additionally requires at least 7 cm
-of foot stagger and
+pelvis yaw/roll, and a distributed lumbar/thoracic curve: the shoulders stay
+ahead of the pelvis, flex farther forward under load, and recover during the up
+pose while the head counter-rotates to stabilize the gaze. Both arms swing
+opposite their corresponding legs, with elbow flex and a reduced staff-side
+arc. Runtime walk phase advances from actual horizontal displacement at 2.75
+radians per metre, so collision, terrain, and boundary corrections cannot
+leave the feet cycling faster than the player moves. The validation receipt
+requires at least 40 cm fore-aft foot travel, 35 degrees of ankle pitch travel,
+support-sole error below 6 mm, 20 cm fore-aft hand travel on each side,
+2.5–5.5 cm vertical and 2.5–4.5 cm lateral hip travel, upper-body response in
+three axes, 3–10 degrees of forward torso lean with at least 2 degrees of
+flexion/recovery, and 6–12 degrees of shoulder-versus-pelvis counter-twist.
+Idle additionally requires at least 7 cm of foot stagger and
 constrains the staff grip and tip outside the skirt at a grounded downward
 angle. Water rendering and hit testing both sample the
 animated `staff.R` and `staff.tip` transforms from that same pose. Procedural
