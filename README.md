@@ -72,8 +72,9 @@ adds one staff-tip socket. The runtime selects five named glTF clips:
 - `Idle` is a looping at-ease stance with staggered feet and the staff resting
   outside the skirt silhouette.
 - `Walk` is an eight-phase game-style stride with planted-foot compression,
-  lateral weight transfer, pelvis rotation, counter-rotating shoulders,
-  contralateral arm swing with elbow flex, and head stabilization.
+  heel strike, toe-off, swing-foot clearance, planted-foot grounding, lateral
+  weight transfer, pelvis rotation, counter-rotating shoulders, contralateral
+  arm swing with elbow flex, and head stabilization.
 - `Chop` is a non-looping staff strike and recovery.
 - `Cast` is selected by the `F` ember action.
 - `Water` is selected by the `Q` water action.

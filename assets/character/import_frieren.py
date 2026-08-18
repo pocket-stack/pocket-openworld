@@ -148,6 +148,32 @@ def normalize_materials(meshes):
         material.diffuse_color = (1.0, 1.0, 1.0, 1.0)
 
 
+def limit_vertex_influences(armature, meshes, maximum=4):
+    """Match the runtime/export skinning limit before grounding the boots."""
+    deform_bones = {bone.name for bone in armature.data.bones if bone.use_deform}
+    for obj in meshes:
+        for vertex in obj.data.vertices:
+            weights = sorted(
+                (
+                    (membership.group, membership.weight)
+                    for membership in vertex.groups
+                    if obj.vertex_groups[membership.group].name in deform_bones
+                ),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+            if len(weights) <= maximum:
+                continue
+            kept = weights[:maximum]
+            total = sum(weight for _, weight in kept)
+            for group_index, _ in weights[maximum:]:
+                obj.vertex_groups[group_index].remove([vertex.index])
+            for group_index, weight in kept:
+                obj.vertex_groups[group_index].add(
+                    [vertex.index], weight / total, "REPLACE"
+                )
+
+
 def clear_animation(armature):
     if armature.animation_data:
         armature.animation_data_clear()
@@ -210,6 +236,56 @@ def key_pose(armature, frame, rotations=None, locations=None, staff_direction=No
         bone.keyframe_insert("scale", frame=frame, group=bone.name)
 
 
+def deformed_sole_heights(armature, meshes):
+    """Return the lowest skinned boot vertex on each side in world metres."""
+    body = next(obj for obj in meshes if obj.name == "body")
+    evaluated = body.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    mesh = evaluated.to_mesh()
+    points = [evaluated.matrix_world @ vertex.co for vertex in mesh.vertices]
+    evaluated.to_mesh_clear()
+    boot_points = [point for point in points if point.z < 0.55]
+    ankles = {
+        side: armature.matrix_world @ armature.pose.bones[f"foot.{side}"].head
+        for side in ("L", "R")
+    }
+    assigned = {"L": [], "R": []}
+    for point in boot_points:
+        side = min(
+            ("L", "R"),
+            key=lambda candidate: Vector(
+                (point.x - ankles[candidate].x, point.y - ankles[candidate].y)
+            ).length_squared,
+        )
+        assigned[side].append(point.z)
+    return {side: min(assigned[side]) for side in ("L", "R")}
+
+
+def ground_walk_pose(armature, meshes, frame, support_side):
+    """Move the pelvis just enough to keep the support boot on the ground."""
+    scene = bpy.context.scene
+    scene.frame_set(frame)
+    bpy.context.view_layer.update()
+    hips = armature.pose.bones["Hips"]
+    base_height = deformed_sole_heights(armature, meshes)[support_side]
+    base_location = hips.location.y
+
+    # Measure rather than assume the source rig's unit scale and rolled root
+    # axes. This keeps the grounding correction reproducible for the supplied
+    # model without baking a magic centimetres-to-bone-space conversion.
+    hips.location.y = base_location + 1.0
+    bpy.context.view_layer.update()
+    metres_per_unit = deformed_sole_heights(armature, meshes)[support_side] - base_height
+    hips.location.y = base_location + (0.0 - base_height) / metres_per_unit
+    bpy.context.view_layer.update()
+    hips.keyframe_insert("location", frame=frame, group=hips.name)
+
+    final_height = deformed_sole_heights(armature, meshes)[support_side]
+    if abs(final_height) > 0.001:
+        raise RuntimeError(
+            f"walk frame {frame} support sole is not grounded: {final_height}"
+        )
+
+
 def relaxed_pose(breath=0.0):
     # The downloaded model is authored in a T pose. Local-Z folds both arms
     # down alongside the body; the remaining values add a natural elbow bend.
@@ -269,7 +345,7 @@ def resting_pose(armature, breath=0.0):
     return relaxed_pose(breath)
 
 
-def create_actions(armature):
+def create_actions(armature, meshes):
     idle = begin_action(armature, "Idle", True)
     for frame, breath in ((1, -0.018), (24, 0.024), (48, -0.018)):
         stance = {
@@ -295,7 +371,6 @@ def create_actions(armature):
             },
             staff_direction=(-0.12, -0.76, -0.64),
         )
-
     walk = begin_action(armature, "Walk", True)
     # A conventional game walk uses contact, down, passing, and up poses for
     # each side. Limbs hinge around Blender world X (the anatomical lateral
@@ -306,15 +381,15 @@ def create_actions(armature):
     walk_frames = (
         # frame, leg L/R, knee L/R, foot roll L/R, arm L/R, elbow L/R,
         # hip x/y/z, pelvis yaw/roll, torso compression (degrees)
-        (1, -0.38, 0.34, 0.10, 0.20, 0.12, -0.14, 0.48, -0.42, -0.05, 0.22, 0.0, 0.0, -0.25, 3.2, 0.0, 0.5),
-        (5, -0.24, 0.23, 0.24, 0.38, 0.04, -0.20, 0.32, -0.30, -0.07, 0.18, 1.25, -1.6, 0.20, 2.1, 1.7, 2.2),
-        (9, 0.10, -0.05, 0.08, 0.62, -0.05, 0.10, 0.05, -0.05, -0.12, 0.12, 1.80, -0.8, 0.0, 0.0, 2.6, 0.0),
-        (13, 0.26, -0.26, 0.12, 0.34, -0.10, 0.05, -0.32, 0.30, -0.18, 0.07, 1.10, 1.6, -0.18, -2.0, 1.5, -0.8),
-        (17, 0.34, -0.38, 0.20, 0.10, -0.14, 0.12, -0.48, 0.42, -0.22, 0.05, 0.0, 0.0, -0.25, -3.2, 0.0, 0.5),
-        (21, 0.23, -0.24, 0.38, 0.24, -0.20, 0.04, -0.32, 0.30, -0.18, 0.07, -1.25, -1.6, 0.20, -2.1, -1.7, 2.2),
-        (25, -0.05, 0.10, 0.62, 0.08, 0.10, -0.05, -0.05, 0.05, -0.12, 0.12, -1.80, -0.8, 0.0, 0.0, -2.6, 0.0),
-        (29, -0.26, 0.26, 0.34, 0.12, 0.05, -0.10, 0.32, -0.30, -0.07, 0.18, -1.10, 1.6, -0.18, 2.0, -1.5, -0.8),
-        (33, -0.38, 0.34, 0.10, 0.20, 0.12, -0.14, 0.48, -0.42, -0.05, 0.22, 0.0, 0.0, -0.25, 3.2, 0.0, 0.5),
+        (1, -0.38, 0.34, 0.10, 0.20, -0.48, 0.38, 0.48, -0.42, -0.05, 0.22, 0.0, 0.0, -0.25, 3.2, 0.0, 0.5),
+        (5, -0.24, 0.23, 0.24, 0.38, -0.05, 0.30, 0.32, -0.30, -0.07, 0.18, 1.25, -1.6, 0.20, 2.1, 1.7, 2.2),
+        (9, 0.10, -0.05, 0.08, 0.62, 0.05, -0.32, 0.05, -0.05, -0.12, 0.12, 1.80, -0.8, 0.0, 0.0, 2.6, 0.0),
+        (13, 0.26, -0.26, 0.12, 0.34, 0.38, -0.40, -0.32, 0.30, -0.18, 0.07, 1.10, 1.6, -0.18, -2.0, 1.5, -0.8),
+        (17, 0.34, -0.38, 0.20, 0.10, 0.38, -0.48, -0.48, 0.42, -0.22, 0.05, 0.0, 0.0, -0.25, -3.2, 0.0, 0.5),
+        (21, 0.23, -0.24, 0.38, 0.24, 0.30, -0.05, -0.32, 0.30, -0.18, 0.07, -1.25, -1.6, 0.20, -2.1, -1.7, 2.2),
+        (25, -0.05, 0.10, 0.62, 0.08, -0.32, 0.05, -0.05, 0.05, -0.12, 0.12, -1.80, -0.8, 0.0, 0.0, -2.6, 0.0),
+        (29, -0.26, 0.26, 0.34, 0.12, -0.40, 0.38, 0.32, -0.30, -0.07, 0.18, -1.10, 1.6, -0.18, 2.0, -1.5, -0.8),
+        (33, -0.38, 0.34, 0.10, 0.20, -0.48, 0.38, 0.48, -0.42, -0.05, 0.22, 0.0, 0.0, -0.25, 3.2, 0.0, 0.5),
     )
     for (
         frame,
@@ -422,6 +497,8 @@ def create_actions(armature):
             {"Hips": (hip_lateral, hip_vertical, hip_forward)},
             staff_direction=(-0.12, -0.76, -0.64),
         )
+        support_side = "L" if frame in (1, 5, 9, 13, 33) else "R"
+        ground_walk_pose(armature, meshes, frame, support_side)
 
     chop = begin_action(armature, "Chop", False)
     chop_frames = {
@@ -573,12 +650,16 @@ def create_actions(armature):
     return {"Idle": idle, "Walk": walk, "Chop": chop, "Cast": cast, "Water": water}
 
 
-def motion_metrics(armature, actions):
+def motion_metrics(armature, meshes, actions):
     """Measure animation axes in Blender world space (X side, -Y forward, Z up)."""
     scene = bpy.context.scene
 
     def point(name):
         return armature.matrix_world @ armature.pose.bones[name].head
+
+    def foot_pitch(side):
+        ankle_to_ball = point(f"toe.{side}") - point(f"foot.{side}")
+        return math.degrees(math.atan2(ankle_to_ball.z, -ankle_to_ball.y))
 
     armature.animation_data.action = actions["Walk"]
     samples = []
@@ -611,12 +692,15 @@ def motion_metrics(armature, actions):
                 "head": head,
                 "left_foot": point("foot.L"),
                 "right_foot": point("foot.R"),
+                "left_ankle_pitch_deg": foot_pitch("L"),
+                "right_ankle_pitch_deg": foot_pitch("R"),
                 "head_relative_lateral": head.x - hips.x,
                 "head_relative_forward": head.y - hips.y,
                 "left_hand_relative_forward": left_hand.y - left_shoulder.y,
                 "right_hand_relative_forward": right_hand.y - right_shoulder.y,
                 "shoulder_counter_roll_deg": math.degrees(counter_roll),
                 "shoulder_counter_twist_deg": math.degrees(counter_twist),
+                "sole_heights": deformed_sole_heights(armature, meshes),
             }
         )
 
@@ -634,6 +718,8 @@ def motion_metrics(armature, actions):
         "left_foot_forward_range_m": axis_range("left_foot", 1),
         "right_foot_lateral_range_m": axis_range("right_foot", 0),
         "right_foot_forward_range_m": axis_range("right_foot", 1),
+        "left_ankle_pitch_range_deg": scalar_range("left_ankle_pitch_deg"),
+        "right_ankle_pitch_range_deg": scalar_range("right_ankle_pitch_deg"),
         "hips_lateral_range_m": axis_range("hips", 0),
         "hips_vertical_range_m": axis_range("hips", 2),
         "head_vertical_range_m": axis_range("head", 2),
@@ -643,11 +729,18 @@ def motion_metrics(armature, actions):
         "right_hand_forward_range_m": scalar_range("right_hand_relative_forward"),
         "shoulder_counter_roll_range_deg": scalar_range("shoulder_counter_roll_deg"),
         "shoulder_counter_twist_range_deg": scalar_range("shoulder_counter_twist_deg"),
+        "support_sole_max_error_m": max(
+            abs(sample["sole_heights"]["L" if sample["frame"] <= 13 else "R"])
+            for sample in samples
+            if sample["frame"] in (1, 5, 9, 13, 17, 21, 25, 29)
+        ),
     }
     if max(result["left_foot_lateral_range_m"], result["right_foot_lateral_range_m"]) > 0.045:
         raise RuntimeError(f"walk feet drift wider than the authored weight transfer: {result}")
     if min(result["left_foot_forward_range_m"], result["right_foot_forward_range_m"]) < 0.40:
         raise RuntimeError(f"walk stride has no readable fore-aft travel: {result}")
+    if min(result["left_ankle_pitch_range_deg"], result["right_ankle_pitch_range_deg"]) < 35.0:
+        raise RuntimeError(f"walk feet remain unnaturally level through the stride: {result}")
     if not 0.025 <= result["hips_vertical_range_m"] <= 0.055:
         raise RuntimeError(f"walk center-of-mass excursion is implausible: {result}")
     if not 0.025 <= result["hips_lateral_range_m"] <= 0.045:
@@ -664,6 +757,8 @@ def motion_metrics(armature, actions):
         raise RuntimeError(f"walk shoulders do not counter-tilt against the pelvis: {result}")
     if not 6.0 <= result["shoulder_counter_twist_range_deg"] <= 12.0:
         raise RuntimeError(f"walk shoulders do not counter-rotate against the pelvis: {result}")
+    if result["support_sole_max_error_m"] > 0.006:
+        raise RuntimeError(f"walk support boot floats above the ground: {result}")
 
     armature.animation_data.action = actions["Idle"]
     scene.frame_set(24)
@@ -727,7 +822,9 @@ def export_glb(armature, meshes):
         export_influence_nb=4,
         export_def_bones=True,
         export_leaf_bone=False,
-        export_optimize_animation_size=True,
+        # Ground contact keys are centimetre-scale; curve simplification can
+        # otherwise lift a planted boot visibly between authored poses.
+        export_optimize_animation_size=False,
         export_optimize_animation_keep_anim_armature=True,
         export_armature_object_remove=False,
         export_extras=True,
@@ -841,7 +938,7 @@ def write_receipt(source, armature, meshes, actions, staff_tip):
             "staff_tip_socket": "staff.tip",
             "staff_tip_world_m": [round(value, 5) for value in staff_tip],
         },
-        "motion": motion_metrics(armature, actions),
+        "motion": motion_metrics(armature, meshes, actions),
         "animations": {
             name: {"frames": list(action.frame_range), "loop": bool(action.get("loop", False))}
             for name, action in actions.items()
@@ -862,8 +959,9 @@ def main():
     validate_source(armature, meshes)
     staff_tip = add_staff_tip_socket(armature, meshes)
     normalize_materials(meshes)
+    limit_vertex_influences(armature, meshes)
     clear_animation(armature)
-    actions = create_actions(armature)
+    actions = create_actions(armature, meshes)
     export_glb(armature, meshes)
     render_previews(armature, meshes, actions)
     write_receipt(source, armature, meshes, actions, staff_tip)

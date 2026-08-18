@@ -25,19 +25,23 @@ Pocket3D clips:
 
 - `Idle`: relaxed breathing in an at-ease, staggered-foot stance with the
   staff grounded outside the skirt.
-- `Walk`: an eight-phase contact/down/passing/up stride with foot roll, pelvis
-  weight transfer, articulated spine and shoulder counter-rotation,
+- `Walk`: an eight-phase contact/down/passing/up stride with heel strike,
+  planted loading, toe-off, swing-foot clearance, skinned-sole grounding,
+  pelvis weight transfer, articulated spine and shoulder counter-rotation,
   contralateral arm swing with elbow flex, restrained head compensation, and a
   skirt-clear staff carry constraint.
 - `Chop`: a forward staff strike used by the tree-cutting interaction.
 - `Cast`: the `F` ember-casting pose.
 - `Water`: the `Q` water-casting pose.
 
-The left hand remains the `hand.L` pickup socket. The receipt rejects a walk
-whose feet drift beyond the authored weight transfer, whose stride lacks
-fore-aft travel, whose pelvis does not shift between support legs, or whose
-upper body lacks vertical response, torso compression, lateral counter-balance,
-shoulder counter-rotation, or measurable hand travel on either side. It also
+The left hand remains the `hand.L` pickup socket. Before grounding, the importer
+applies the same four-weight skinning limit used by the runtime GLB exporter.
+The receipt rejects a walk whose feet drift beyond the authored weight
+transfer, whose ankles remain level instead of rolling through heel strike and
+toe-off, whose support boot leaves the ground, whose stride lacks fore-aft
+travel, whose pelvis does not shift between support legs, or whose upper body
+lacks vertical response, torso compression, lateral counter-balance, shoulder
+counter-rotation, or measurable hand travel on either side. It also
 rejects a rigid attention-style Idle pose, an Idle staff crossing the skirt
 silhouette, or a Water pose that does not aim the staff forward. The importer
 embeds the source texture as a glTF PBR base-color texture, writes

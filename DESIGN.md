@@ -123,14 +123,18 @@ upper-arm, and staff motion share one sampled pose.
 
 The walk clip hinges limbs about the character's anatomical left-right world
 axis instead of the source bones' rolled local X axes. Its eight contact,
-down, passing, and up poses add foot roll, support-side pelvis translation,
+down, passing, and up poses move each ankle through heel strike, planted
+loading, toe-off, and dorsiflexed swing clearance. Each authored support pose
+measures the four-weight skinned boot and adjusts the pelvis until its sole
+meets the ground plane. The poses also add support-side pelvis translation,
 pelvis yaw/roll, articulated spine compression, shoulder counter-rotation, and
 restrained head compensation. Both arms swing opposite their corresponding
 legs, with elbow flex and a reduced staff-side arc. The validation receipt
-requires at least 40 cm fore-aft foot travel, 20 cm fore-aft hand travel on
-each side, 2.5–5.5 cm vertical and 2.5–4.5 cm lateral hip travel, upper-body
-response in three axes, and 6–12 degrees of shoulder-versus-pelvis
-counter-twist. Idle additionally requires at least 7 cm of foot stagger and
+requires at least 40 cm fore-aft foot travel, 35 degrees of ankle pitch travel,
+support-sole error below 6 mm, 20 cm fore-aft hand travel on each side,
+2.5–5.5 cm vertical and 2.5–4.5 cm lateral hip travel, upper-body response in
+three axes, and 6–12 degrees of shoulder-versus-pelvis counter-twist. Idle
+additionally requires at least 7 cm of foot stagger and
 constrains the staff grip and tip outside the skirt at a grounded downward
 angle. Water rendering and hit testing both sample the
 animated `staff.R` and `staff.tip` transforms from that same pose. Procedural
