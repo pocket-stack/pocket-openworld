@@ -27,6 +27,7 @@ use crate::art;
 
 const PLAYER_HEIGHT: f32 = 0.84;
 const MOVE_SPEED: f32 = 3.55;
+const WALK_PHASE_RADIANS_PER_METER: f32 = 2.75;
 const CHOP_REACH: f32 = 2.55;
 const ACTION_REACH: f32 = 4.6;
 const AXE_SWING_TURNS: u16 = 18;
@@ -219,6 +220,11 @@ fn camera_relative_movement(axis: Vec2, yaw: f32) -> Vec3 {
     // therefore screen-right is +X.
     let right = Vec3::new(-forward.z, 0.0, forward.x);
     (right * axis.x + forward * axis.y).normalize_or_zero()
+}
+
+fn walk_phase_advance(previous: Vec3, current: Vec3) -> f32 {
+    let displacement = current - previous;
+    Vec2::new(displacement.x, displacement.z).length() * WALK_PHASE_RADIANS_PER_METER
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1288,9 +1294,7 @@ impl WorldGame {
                 body.linear_velocity = velocity;
             }
         }
-        if movement.length_squared() > 0.0 {
-            self.walk_phase += dt * 8.5;
-        }
+        self.walk_phase += walk_phase_advance(previous, position);
     }
 
     fn sync_held_apple_to_hand(&mut self) {
@@ -2821,6 +2825,16 @@ mod tests {
             assert!(d_movement.dot(camera.forward_flat()).abs() < 1e-6);
         }
         assert_eq!(camera_relative_movement(Vec2::X, 0.0), Vec3::X);
+    }
+
+    #[test]
+    fn walk_phase_tracks_actual_horizontal_distance() {
+        let origin = Vec3::new(2.0, 0.8, -3.0);
+        assert_eq!(walk_phase_advance(origin, origin + Vec3::Y), 0.0);
+        assert!((walk_phase_advance(origin, origin + Vec3::X) - 2.75).abs() < 1e-6);
+        assert!(
+            (walk_phase_advance(origin, origin + Vec3::new(3.0, 4.0, -4.0)) - 13.75).abs() < 1e-6
+        );
     }
 
     #[test]

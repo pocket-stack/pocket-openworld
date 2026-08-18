@@ -76,6 +76,12 @@ def validate_source(armature, meshes):
         "foot.R",
         "staff.R",
     }
+    required.update(
+        f"{finger}.{side}{suffix}"
+        for side in ("L", "R")
+        for finger in ("thumb", "index", "middle", "ring", "pinky")
+        for suffix in ("", ".001", ".002")
+    )
     missing = sorted(required - set(armature.data.bones.keys()))
     if missing:
         raise RuntimeError(f"source rig is missing required bones: {missing}")
@@ -286,10 +292,60 @@ def ground_walk_pose(armature, meshes, frame, support_side):
         )
 
 
+def finger_pose(side, curl_scale, flex=0.0):
+    """Author a relaxed fan and progressive curl through each finger chain."""
+    mirror = 1.0 if side == "L" else -1.0
+    curls = {
+        "thumb": (0.14, 0.20, 0.14),
+        "index": (0.10, 0.18, 0.12),
+        "middle": (0.14, 0.24, 0.16),
+        "ring": (0.18, 0.30, 0.20),
+        "pinky": (0.22, 0.34, 0.24),
+    }
+    splay = {
+        "thumb": 0.10,
+        "index": 0.06,
+        "middle": 0.02,
+        "ring": -0.035,
+        "pinky": -0.08,
+    }
+    pose = {}
+    for finger, chain in curls.items():
+        for segment, base_curl in enumerate(chain):
+            suffix = "" if segment == 0 else f".{segment:03d}"
+            segment_flex = flex * (1.0, 1.2, 0.8)[segment]
+            pose[f"{finger}.{side}{suffix}"] = (
+                base_curl * curl_scale + segment_flex,
+                0.0,
+                mirror * splay[finger] if segment == 0 else 0.0,
+            )
+    return pose
+
+
+def finger_flex_delta(side, amount):
+    """Add subtle non-uniform finger motion during the arm swing."""
+    pose = {}
+    for finger, weight in (
+        ("thumb", 0.45),
+        ("index", 0.72),
+        ("middle", 1.0),
+        ("ring", 0.88),
+        ("pinky", 0.68),
+    ):
+        for segment, segment_weight in enumerate((0.65, 1.0, 0.72)):
+            suffix = "" if segment == 0 else f".{segment:03d}"
+            pose[f"{finger}.{side}{suffix}"] = (
+                amount * weight * segment_weight,
+                0.0,
+                0.0,
+            )
+    return pose
+
+
 def relaxed_pose(breath=0.0):
     # The downloaded model is authored in a T pose. Local-Z folds both arms
     # down alongside the body; the remaining values add a natural elbow bend.
-    return {
+    pose = {
         "Spine2": (0.0, breath * 0.35, 0.0),
         "Head": (breath * -0.18, 0.0, breath * 0.12),
         "Arm.L": (0.0, 0.04, math.radians(-72.0) + breath),
@@ -300,6 +356,9 @@ def relaxed_pose(breath=0.0):
         "hand.R": (0.0, 0.0, math.radians(7.0)),
         "staff.R": (0.0, 0.0, math.radians(-4.0)),
     }
+    pose.update(finger_pose("L", 2.00, breath * 0.35))
+    pose.update(finger_pose("R", 3.00, breath * 0.18))
+    return pose
 
 
 def merged(base, extra):
@@ -490,6 +549,8 @@ def create_actions(armature, meshes):
         rotations["Arm.R"] = pose_with_world_axes(
             armature, "Arm.R", rest["Arm.R"], (((1, 0, 0), right_arm),)
         )
+        rotations = merged(rotations, finger_flex_delta("L", left_arm * 0.22))
+        rotations = merged(rotations, finger_flex_delta("R", right_arm * 0.10))
         key_pose(
             armature,
             frame,
@@ -657,6 +718,24 @@ def motion_metrics(armature, meshes, actions):
     def point(name):
         return armature.matrix_world @ armature.pose.bones[name].head
 
+    def tail(name):
+        return armature.matrix_world @ armature.pose.bones[name].tail
+
+    def finger_reach(side, finger="index"):
+        return (tail(f"{finger}.{side}.002") - point(f"{finger}.{side}")).length
+
+    def finger_curl_ratio(side, finger="index"):
+        reach = finger_reach(side, finger)
+        chain_length = sum(
+            (tail(name) - point(name)).length
+            for name in (
+                f"{finger}.{side}",
+                f"{finger}.{side}.001",
+                f"{finger}.{side}.002",
+            )
+        )
+        return reach / chain_length
+
     def foot_pitch(side):
         ankle_to_ball = point(f"toe.{side}") - point(f"foot.{side}")
         return math.degrees(math.atan2(ankle_to_ball.z, -ankle_to_ball.y))
@@ -694,6 +773,8 @@ def motion_metrics(armature, meshes, actions):
                 "right_foot": point("foot.R"),
                 "left_ankle_pitch_deg": foot_pitch("L"),
                 "right_ankle_pitch_deg": foot_pitch("R"),
+                "left_index_reach_m": finger_reach("L"),
+                "right_index_reach_m": finger_reach("R"),
                 "head_relative_lateral": head.x - hips.x,
                 "head_relative_forward": head.y - hips.y,
                 "left_hand_relative_forward": left_hand.y - left_shoulder.y,
@@ -720,6 +801,8 @@ def motion_metrics(armature, meshes, actions):
         "right_foot_forward_range_m": axis_range("right_foot", 1),
         "left_ankle_pitch_range_deg": scalar_range("left_ankle_pitch_deg"),
         "right_ankle_pitch_range_deg": scalar_range("right_ankle_pitch_deg"),
+        "left_index_reach_range_m": scalar_range("left_index_reach_m"),
+        "right_index_reach_range_m": scalar_range("right_index_reach_m"),
         "hips_lateral_range_m": axis_range("hips", 0),
         "hips_vertical_range_m": axis_range("hips", 2),
         "head_vertical_range_m": axis_range("head", 2),
@@ -753,6 +836,10 @@ def motion_metrics(armature, meshes, actions):
         raise RuntimeError(f"walk torso has no compression and recovery: {result}")
     if min(result["left_hand_forward_range_m"], result["right_hand_forward_range_m"]) < 0.20:
         raise RuntimeError(f"walk arms have no readable fore-aft swing: {result}")
+    if result["left_index_reach_range_m"] < 0.0005:
+        raise RuntimeError(f"walk free-hand fingers remain rigid: {result}")
+    if result["right_index_reach_range_m"] < 0.0002:
+        raise RuntimeError(f"walk staff-hand fingers remain rigid: {result}")
     if not 5.0 <= result["shoulder_counter_roll_range_deg"] <= 10.0:
         raise RuntimeError(f"walk shoulders do not counter-tilt against the pelvis: {result}")
     if not 6.0 <= result["shoulder_counter_twist_range_deg"] <= 12.0:
@@ -773,6 +860,8 @@ def motion_metrics(armature, meshes, actions):
             "idle_staff_grip_lateral_m": abs(idle_staff_grip.x),
             "idle_staff_tip_height_m": idle_staff_tip.z,
             "idle_staff_vertical_slope": idle_staff_direction.z,
+            "idle_left_index_curl_ratio": finger_curl_ratio("L"),
+            "idle_right_index_curl_ratio": finger_curl_ratio("R"),
         }
     )
     if result["idle_foot_stagger_m"] < 0.07:
@@ -783,6 +872,10 @@ def motion_metrics(armature, meshes, actions):
         raise RuntimeError(f"Idle staff no longer rests just above the ground: {result}")
     if result["idle_staff_vertical_slope"] > -0.50:
         raise RuntimeError(f"Idle staff is not angled down outside the skirt: {result}")
+    if not 0.94 <= result["idle_left_index_curl_ratio"] <= 0.99:
+        raise RuntimeError(f"Idle free hand is rigid or clenched: {result}")
+    if not 0.75 <= result["idle_right_index_curl_ratio"] <= 0.96:
+        raise RuntimeError(f"Idle staff hand does not form a relaxed grip: {result}")
 
     armature.animation_data.action = actions["Water"]
     scene.frame_set(12)

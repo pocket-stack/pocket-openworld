@@ -129,12 +129,18 @@ measures the four-weight skinned boot and adjusts the pelvis until its sole
 meets the ground plane. The poses also add support-side pelvis translation,
 pelvis yaw/roll, articulated spine compression, shoulder counter-rotation, and
 restrained head compensation. Both arms swing opposite their corresponding
-legs, with elbow flex and a reduced staff-side arc. The validation receipt
-requires at least 40 cm fore-aft foot travel, 35 degrees of ankle pitch travel,
-support-sole error below 6 mm, 20 cm fore-aft hand travel on each side,
-2.5–5.5 cm vertical and 2.5–4.5 cm lateral hip travel, upper-body response in
-three axes, and 6–12 degrees of shoulder-versus-pelvis counter-twist. Idle
-additionally requires at least 7 cm of foot stagger and
+legs, with elbow flex and a reduced staff-side arc. The free hand uses a
+progressive finger fan while the staff hand keeps a deeper grip; both add small
+non-uniform flex over the arm swing. Runtime walk phase advances from actual
+horizontal displacement at 2.75 radians per metre, so collision, terrain, and
+boundary corrections cannot leave the feet cycling faster than the player
+moves. The validation receipt requires at least 40 cm fore-aft foot travel,
+35 degrees of ankle pitch travel, support-sole error below 6 mm, 20 cm
+fore-aft hand travel on each side, measurable index-finger flex, 2.5–5.5 cm
+vertical and 2.5–4.5 cm lateral hip travel, upper-body response in three axes,
+and 6–12 degrees of shoulder-versus-pelvis counter-twist. Idle additionally
+requires naturally distinct open-hand and staff-grip curl ratios, at least
+7 cm of foot stagger, and
 constrains the staff grip and tip outside the skirt at a grounded downward
 angle. Water rendering and hit testing both sample the
 animated `staff.R` and `staff.tip` transforms from that same pose. Procedural
