@@ -29,8 +29,8 @@ Pocket3D clips:
   planted loading, toe-off, swing-foot clearance, skinned-sole grounding,
   pelvis weight transfer, articulated spine and shoulder counter-rotation,
   contralateral arm swing with elbow flex, a relaxed free-hand finger fan, a
-  lightly flexing staff grip, restrained head compensation, and a skirt-clear
-  staff carry constraint.
+  thumb-opposed staff grip that only tightens during the arm swing, restrained
+  head compensation, and a skirt-clear staff carry constraint.
 - `Chop`: a forward staff strike used by the tree-cutting interaction.
 - `Cast`: the `F` ember-casting pose.
 - `Water`: the `Q` water-casting pose.
@@ -43,7 +43,9 @@ toe-off, whose support boot leaves the ground, whose stride lacks fore-aft
 travel, whose pelvis does not shift between support legs, or whose upper body
 lacks vertical response, torso compression, lateral counter-balance, shoulder
 counter-rotation, measurable hand travel, or finger articulation on either
-side. It also
+side. Staff-hand validation also measures the thumb and four distal fingers
+against the animated shaft axis, rejecting a thumb farther than 6.5 cm or a
+mean fingertip distance above 9 cm in either Idle or Walk. It also
 rejects a rigid attention-style Idle pose, an Idle staff crossing the skirt
 silhouette, or a Water pose that does not aim the staff forward. The importer
 embeds the source texture as a glTF PBR base-color texture, writes

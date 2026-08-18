@@ -26,6 +26,7 @@ GLB_PATH = HERE / "frieren.glb"
 PREVIEW_DIR = HERE / "frieren-previews"
 RECEIPT_PATH = HERE / "frieren-receipt.json"
 SOURCE_URL = "https://booth.pm/ja/items/5469071"
+STAFF_GRIP_LOCATION = (-0.71, 1.94, 0.64)
 
 
 def arguments():
@@ -230,6 +231,10 @@ def key_pose(armature, frame, rotations=None, locations=None, staff_direction=No
     reset_pose(armature)
     rotations = rotations or {}
     locations = locations or {}
+    # Keep the shaft inside the closed finger arc instead of on the palm edge.
+    # This is a hand-local attachment offset, so every action shares the same
+    # grip geometry while aim_staff remains free to change the world direction.
+    armature.pose.bones["staff.R"].location = STAFF_GRIP_LOCATION
     for name, value in rotations.items():
         armature.pose.bones[name].rotation_euler = value
     for name, value in locations.items():
@@ -342,6 +347,31 @@ def finger_flex_delta(side, amount):
     return pose
 
 
+def staff_grip_pose():
+    """Wrap the right hand around the staff with the thumb in opposition."""
+    pose = finger_pose("R", 3.00)
+    adjustments = {
+        "thumb.R": (-0.48, -0.48, 0.96),
+        "thumb.R.001": (0.0, -0.48, 0.0),
+        "thumb.R.002": (-0.06, 0.06, 0.48),
+        "index.R": (0.12, 0.0, 0.0),
+        "index.R.001": (0.30, 0.0, 0.0),
+        "index.R.002": (0.24, 0.0, 0.0),
+        "middle.R": (0.12, 0.0, 0.0),
+        "middle.R.001": (0.30, 0.0, 0.0),
+        "middle.R.002": (0.24, 0.0, 0.0),
+        "ring.R": (0.10, 0.0, 0.0),
+        "ring.R.001": (0.25, 0.0, 0.0),
+        "ring.R.002": (0.20, 0.0, 0.0),
+        "pinky.R": (0.08, 0.0, 0.0),
+        "pinky.R.001": (0.20, 0.0, 0.0),
+        "pinky.R.002": (0.16, 0.0, 0.0),
+    }
+    for name, delta in adjustments.items():
+        pose[name] = tuple(pose[name][axis] + delta[axis] for axis in range(3))
+    return pose
+
+
 def relaxed_pose(breath=0.0):
     # The downloaded model is authored in a T pose. Local-Z folds both arms
     # down alongside the body; the remaining values add a natural elbow bend.
@@ -357,7 +387,7 @@ def relaxed_pose(breath=0.0):
         "staff.R": (0.0, 0.0, math.radians(-4.0)),
     }
     pose.update(finger_pose("L", 2.00, breath * 0.35))
-    pose.update(finger_pose("R", 3.00, breath * 0.18))
+    pose.update(staff_grip_pose())
     return pose
 
 
@@ -550,7 +580,12 @@ def create_actions(armature, meshes):
             armature, "Arm.R", rest["Arm.R"], (((1, 0, 0), right_arm),)
         )
         rotations = merged(rotations, finger_flex_delta("L", left_arm * 0.22))
-        rotations = merged(rotations, finger_flex_delta("R", right_arm * 0.10))
+        # The staff hand subtly tightens with each step but never opens with
+        # the arm swing, so the thumb remains visibly opposed to the fingers.
+        rotations = merged(
+            rotations,
+            finger_flex_delta("R", 0.008 + abs(right_arm) * 0.060),
+        )
         key_pose(
             armature,
             frame,
@@ -736,6 +771,27 @@ def motion_metrics(armature, meshes, actions):
         )
         return reach / chain_length
 
+    def staff_grip_metrics():
+        grip = point("staff.R")
+        staff_axis = (point("staff.tip") - grip).normalized()
+
+        def radial_offset(sample_point):
+            offset = sample_point - grip
+            return offset - staff_axis * offset.dot(staff_axis)
+
+        thumb_offset = radial_offset(tail("thumb.R.002"))
+        finger_offsets = [
+            radial_offset(tail(f"{finger}.R.002"))
+            for finger in ("index", "middle", "ring", "pinky")
+        ]
+        return {
+            "thumb_axis_distance_m": thumb_offset.length,
+            "finger_axis_mean_distance_m": sum(
+                offset.length for offset in finger_offsets
+            )
+            / len(finger_offsets),
+        }
+
     def foot_pitch(side):
         ankle_to_ball = point(f"toe.{side}") - point(f"foot.{side}")
         return math.degrees(math.atan2(ankle_to_ball.z, -ankle_to_ball.y))
@@ -750,6 +806,7 @@ def motion_metrics(armature, meshes, actions):
         right_shoulder = point("Arm.R")
         left_hand = point("hand.L")
         right_hand = point("hand.R")
+        grip_metrics = staff_grip_metrics()
         shoulder_axis = left_shoulder - right_shoulder
         hips_axis = (
             armature.matrix_world.to_3x3()
@@ -775,6 +832,12 @@ def motion_metrics(armature, meshes, actions):
                 "right_ankle_pitch_deg": foot_pitch("R"),
                 "left_index_reach_m": finger_reach("L"),
                 "right_index_reach_m": finger_reach("R"),
+                "staff_thumb_axis_distance_m": grip_metrics[
+                    "thumb_axis_distance_m"
+                ],
+                "staff_finger_axis_mean_distance_m": grip_metrics[
+                    "finger_axis_mean_distance_m"
+                ],
                 "head_relative_lateral": head.x - hips.x,
                 "head_relative_forward": head.y - hips.y,
                 "left_hand_relative_forward": left_hand.y - left_shoulder.y,
@@ -803,6 +866,12 @@ def motion_metrics(armature, meshes, actions):
         "right_ankle_pitch_range_deg": scalar_range("right_ankle_pitch_deg"),
         "left_index_reach_range_m": scalar_range("left_index_reach_m"),
         "right_index_reach_range_m": scalar_range("right_index_reach_m"),
+        "walk_staff_thumb_axis_max_distance_m": max(
+            sample["staff_thumb_axis_distance_m"] for sample in samples
+        ),
+        "walk_staff_finger_axis_mean_max_distance_m": max(
+            sample["staff_finger_axis_mean_distance_m"] for sample in samples
+        ),
         "hips_lateral_range_m": axis_range("hips", 0),
         "hips_vertical_range_m": axis_range("hips", 2),
         "head_vertical_range_m": axis_range("head", 2),
@@ -840,6 +909,10 @@ def motion_metrics(armature, meshes, actions):
         raise RuntimeError(f"walk free-hand fingers remain rigid: {result}")
     if result["right_index_reach_range_m"] < 0.0002:
         raise RuntimeError(f"walk staff-hand fingers remain rigid: {result}")
+    if result["walk_staff_thumb_axis_max_distance_m"] > 0.065:
+        raise RuntimeError(f"walk staff-hand thumb opens away from the shaft: {result}")
+    if result["walk_staff_finger_axis_mean_max_distance_m"] > 0.090:
+        raise RuntimeError(f"walk staff-hand fingers lose contact with the shaft: {result}")
     if not 5.0 <= result["shoulder_counter_roll_range_deg"] <= 10.0:
         raise RuntimeError(f"walk shoulders do not counter-tilt against the pelvis: {result}")
     if not 6.0 <= result["shoulder_counter_twist_range_deg"] <= 12.0:
@@ -854,6 +927,7 @@ def motion_metrics(armature, meshes, actions):
     idle_staff_grip = point("staff.R")
     idle_staff_tip = point("staff.tip")
     idle_staff_direction = (idle_staff_tip - idle_staff_grip).normalized()
+    idle_grip_metrics = staff_grip_metrics()
     result.update(
         {
             "idle_foot_stagger_m": abs(idle_left_foot.y - idle_right_foot.y),
@@ -862,6 +936,12 @@ def motion_metrics(armature, meshes, actions):
             "idle_staff_vertical_slope": idle_staff_direction.z,
             "idle_left_index_curl_ratio": finger_curl_ratio("L"),
             "idle_right_index_curl_ratio": finger_curl_ratio("R"),
+            "idle_staff_thumb_axis_distance_m": idle_grip_metrics[
+                "thumb_axis_distance_m"
+            ],
+            "idle_staff_finger_axis_mean_distance_m": idle_grip_metrics[
+                "finger_axis_mean_distance_m"
+            ],
         }
     )
     if result["idle_foot_stagger_m"] < 0.07:
@@ -876,6 +956,10 @@ def motion_metrics(armature, meshes, actions):
         raise RuntimeError(f"Idle free hand is rigid or clenched: {result}")
     if not 0.75 <= result["idle_right_index_curl_ratio"] <= 0.96:
         raise RuntimeError(f"Idle staff hand does not form a relaxed grip: {result}")
+    if result["idle_staff_thumb_axis_distance_m"] > 0.065:
+        raise RuntimeError(f"Idle staff-hand thumb opens away from the shaft: {result}")
+    if result["idle_staff_finger_axis_mean_distance_m"] > 0.090:
+        raise RuntimeError(f"Idle staff-hand fingers lose contact with the shaft: {result}")
 
     armature.animation_data.action = actions["Water"]
     scene.frame_set(12)
