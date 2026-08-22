@@ -1,0 +1,325 @@
+{
+  "schema": "pocket3d.playable-world.receipt.v1",
+  "scenario": "world-law-crossover",
+  "seed": 7,
+  "ticks": 190,
+  "state_hash": "6be53798f4950106",
+  "contact_count": 0,
+  "fractured_entities": [],
+  "detached_entities": [],
+  "ignited_entities": [],
+  "extinguished_entities": [],
+  "cooked_entities": [],
+  "charred_entities": [],
+  "water": {
+    "emitted": 0.0,
+    "delivered": 0.0,
+    "delivered_by_entity": [],
+    "last_spray_tick": null,
+    "campfire_douse": {
+      "entities": [
+        0
+      ],
+      "all_extinguished": false,
+      "all_not_burning": false,
+      "reignited_after_spray": [],
+      "post_spray_turns": 0,
+      "required_stability_turns": 180,
+      "passed": false
+    }
+  },
+  "acceptance": {
+    "tree_fractured": false,
+    "fruit_detached": false,
+    "detached_fruit_hit_terrain": false,
+    "fire_changed_reactive_state": false,
+    "spatial_fire_propagated": false,
+    "damp_fuel_resisted_ignition": false,
+    "playable_chain_complete": false
+  },
+  "landmarks": [],
+  "entities": [
+    {
+      "id": 1,
+      "name": "world-law observer",
+      "tags": [
+        "player"
+      ],
+      "position": [
+        -0.5,
+        0.7288552,
+        11.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Kinematic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 2,
+      "name": "identity field constitution",
+      "tags": [],
+      "position": [
+        -2.1,
+        3.0482652,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Static",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 3,
+      "name": "crossover soul core",
+      "tags": [],
+      "position": [
+        -2.1,
+        3.1482651,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": null,
+      "linear_velocity": null,
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 4,
+      "name": "ordinary titan biomass impact",
+      "tags": [
+        "law-probe"
+      ],
+      "position": [
+        1.9320364,
+        3.0482652,
+        -5.2971606
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        -0.26756763,
+        0.0,
+        -1.6945951
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 5,
+      "name": "high momentum titan biomass impact",
+      "tags": [
+        "law-probe"
+      ],
+      "position": [
+        -22.299992,
+        3.0482652,
+        0.85
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        -16.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    }
+  ],
+  "world_laws": {
+    "schema": "pocket3d.world-law.receipt.v1",
+    "scenario": "world-law-crossover",
+    "physics_tick": 190,
+    "law_tick": 191,
+    "state_hash": "6ee66afb0a5f6fc5",
+    "hidden_states": [
+      {
+        "key": {
+          "entity": 3,
+          "name": "eva.soul.identity"
+        },
+        "value": {
+          "Scalar": 1.0
+        }
+      }
+    ],
+    "relations": [
+      {
+        "key": {
+          "kind": "eva.embodied-by",
+          "from": 3,
+          "to": 2
+        },
+        "strength": 1.0
+      }
+    ],
+    "fields": [
+      {
+        "key": {
+          "channel": "eva.identity-boundary",
+          "source": 2
+        },
+        "center": [
+          -2.1,
+          3.0482652,
+          0.0
+        ],
+        "radius": 3.4,
+        "intensity": 4800.0,
+        "polarity": 1.0
+      }
+    ],
+    "events": [
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 3,
+            "name": "eva.soul.identity",
+            "value": {
+              "Scalar": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "RelationBound": {
+            "relation": {
+              "key": {
+                "kind": "eva.embodied-by",
+                "from": 3,
+                "to": 2
+              },
+              "strength": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "FieldChanged": {
+            "field": {
+              "key": {
+                "channel": "eva.identity-boundary",
+                "source": 2
+              },
+              "center": [
+                -2.1,
+                3.0482652,
+                0.0
+              ],
+              "radius": 3.4,
+              "intensity": 4800.0,
+              "polarity": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 30,
+        "event": {
+          "Projection": {
+            "law": "eva.identity-boundary-projection",
+            "source": 2,
+            "target": 4,
+            "kind": "kinetic-block",
+            "magnitude": 3069.4758,
+            "position": [
+              1.2583942,
+              3.0482652,
+              -0.5302729
+            ],
+            "direction": [
+              0.987763,
+              0.0,
+              -0.15596262
+            ]
+          }
+        }
+      }
+    ],
+    "eva": null,
+    "titan": null,
+    "crossover": {
+      "field_source": 2,
+      "blocked_body": 4,
+      "penetrating_body": 5,
+      "blocked_body_energy": 3146.0,
+      "penetrating_body_energy": 6656.0,
+      "field_budget": 4800.0,
+      "low_energy_body_blocked": true,
+      "high_energy_body_penetrated": true,
+      "crossover_specific_rule_count": 0
+    },
+    "acceptance_passed": true
+  }
+}
