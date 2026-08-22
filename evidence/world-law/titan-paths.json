@@ -1,0 +1,986 @@
+{
+  "schema": "pocket3d.playable-world.receipt.v1",
+  "scenario": "titan-paths",
+  "seed": 7,
+  "ticks": 300,
+  "state_hash": "05290374e9391ada",
+  "contact_count": 13,
+  "fractured_entities": [
+    9
+  ],
+  "detached_entities": [],
+  "ignited_entities": [],
+  "extinguished_entities": [],
+  "cooked_entities": [],
+  "charred_entities": [],
+  "water": {
+    "emitted": 0.0,
+    "delivered": 0.0,
+    "delivered_by_entity": [],
+    "last_spray_tick": null,
+    "campfire_douse": {
+      "entities": [
+        0
+      ],
+      "all_extinguished": false,
+      "all_not_burning": false,
+      "reignited_after_spray": [],
+      "post_spray_turns": 0,
+      "required_stability_turns": 180,
+      "passed": false
+    }
+  },
+  "acceptance": {
+    "tree_fractured": false,
+    "fruit_detached": false,
+    "detached_fruit_hit_terrain": false,
+    "fire_changed_reactive_state": false,
+    "spatial_fire_propagated": false,
+    "damp_fuel_resisted_ignition": false,
+    "playable_chain_complete": false
+  },
+  "landmarks": [
+    {
+      "tick": 157,
+      "event": {
+        "Fractured": {
+          "entity": 9,
+          "direction": [
+            0.912871,
+            0.1825742,
+            0.3651484
+          ],
+          "energy": 2.0
+        }
+      }
+    }
+  ],
+  "entities": [
+    {
+      "id": 1,
+      "name": "world-law observer",
+      "tags": [
+        "player"
+      ],
+      "position": [
+        8.5,
+        0.8857943,
+        10.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Kinematic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 2,
+      "name": "titan power host",
+      "tags": [],
+      "position": [
+        -2.8,
+        0.94826525,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": null,
+      "linear_velocity": null,
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 3,
+      "name": "paths nexus",
+      "tags": [],
+      "position": [
+        0.0,
+        13.048265,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": null,
+      "linear_velocity": null,
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 4,
+      "name": "titan avatar torso",
+      "tags": [
+        "biomass",
+        "titan-avatar"
+      ],
+      "position": [
+        0.0,
+        5.0482655,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Kinematic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 5,
+      "name": "head",
+      "tags": [
+        "biomass",
+        "titan-avatar"
+      ],
+      "position": [
+        0.0,
+        8.048265,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": 4,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 6,
+      "name": "left-leg",
+      "tags": [
+        "biomass",
+        "titan-avatar"
+      ],
+      "position": [
+        -0.58,
+        1.7982655,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": 4,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 7,
+      "name": "right-leg",
+      "tags": [
+        "biomass",
+        "titan-avatar"
+      ],
+      "position": [
+        0.58,
+        1.7982655,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": 4,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 8,
+      "name": "left-arm",
+      "tags": [
+        "biomass",
+        "titan-avatar"
+      ],
+      "position": [
+        -1.65,
+        5.4982653,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.08987855,
+        0.9959527
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": 4,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 9,
+      "name": "right-arm",
+      "tags": [
+        "biomass",
+        "titan-avatar"
+      ],
+      "position": [
+        4.093034,
+        1.3892426,
+        1.075238
+      ],
+      "rotation": [
+        0.20553842,
+        -0.01854852,
+        -0.43912148,
+        0.8744039
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        0.026841877,
+        -0.38614723,
+        0.187146
+      ],
+      "attached_to": null,
+      "structure_fraction": 0.0,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 10,
+      "name": "regenerated titan right arm",
+      "tags": [
+        "biomass",
+        "titan-avatar"
+      ],
+      "position": [
+        1.65,
+        5.4982653,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.08987855,
+        0.9959527
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": 4,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    }
+  ],
+  "world_laws": {
+    "schema": "pocket3d.world-law.receipt.v1",
+    "scenario": "titan-paths",
+    "physics_tick": 300,
+    "law_tick": 301,
+    "state_hash": "3979bd8f1a328027",
+    "hidden_states": [
+      {
+        "key": {
+          "entity": 2,
+          "name": "body.injury"
+        },
+        "value": {
+          "Scalar": 1.0
+        }
+      },
+      {
+        "key": {
+          "entity": 2,
+          "name": "mind.intent"
+        },
+        "value": {
+          "Scalar": 1.0
+        }
+      },
+      {
+        "key": {
+          "entity": 2,
+          "name": "titan.morphology"
+        },
+        "value": {
+          "Symbol": "titan-avatar"
+        }
+      },
+      {
+        "key": {
+          "entity": 2,
+          "name": "titan.power"
+        },
+        "value": {
+          "Flag": true
+        }
+      },
+      {
+        "key": {
+          "entity": 2,
+          "name": "titan.subject"
+        },
+        "value": {
+          "Flag": true
+        }
+      }
+    ],
+    "relations": [
+      {
+        "key": {
+          "kind": "titan.connected-via-paths",
+          "from": 2,
+          "to": 3
+        },
+        "strength": 1.0
+      }
+    ],
+    "fields": [],
+    "events": [
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "body.injury",
+            "value": {
+              "Scalar": 0.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "mind.intent",
+            "value": {
+              "Scalar": 0.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "titan.morphology",
+            "value": {
+              "Symbol": "human"
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "titan.power",
+            "value": {
+              "Flag": true
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "titan.subject",
+            "value": {
+              "Flag": true
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "RelationBound": {
+            "relation": {
+              "key": {
+                "kind": "titan.connected-via-paths",
+                "from": 2,
+                "to": 3
+              },
+              "strength": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 13,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "body.injury",
+            "value": {
+              "Scalar": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 31,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "mind.intent",
+            "value": {
+              "Scalar": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 32,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "titan.morphology",
+            "value": {
+              "Symbol": "titan-materializing"
+            }
+          }
+        }
+      },
+      {
+        "tick": 32,
+        "event": {
+          "Transition": {
+            "law": "titan.materialization",
+            "entity": 2,
+            "from": "human",
+            "to": "titan-materializing"
+          }
+        }
+      },
+      {
+        "tick": 36,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 4,
+            "form": "torso",
+            "progress": 0.055555556
+          }
+        }
+      },
+      {
+        "tick": 41,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 5,
+            "form": "head",
+            "progress": 0.059139784
+          }
+        }
+      },
+      {
+        "tick": 46,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 6,
+            "form": "left-leg",
+            "progress": 0.063307494
+          }
+        }
+      },
+      {
+        "tick": 50,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 7,
+            "form": "right-leg",
+            "progress": 0.0506329
+          }
+        }
+      },
+      {
+        "tick": 55,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 8,
+            "form": "left-arm",
+            "progress": 0.05478395
+          }
+        }
+      },
+      {
+        "tick": 57,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 4,
+            "form": "torso",
+            "progress": 0.3472222
+          }
+        }
+      },
+      {
+        "tick": 60,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 5,
+            "form": "head",
+            "progress": 0.34289128
+          }
+        }
+      },
+      {
+        "tick": 60,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 9,
+            "form": "right-arm",
+            "progress": 0.059829082
+          }
+        }
+      },
+      {
+        "tick": 64,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 6,
+            "form": "left-leg",
+            "progress": 0.35400516
+          }
+        }
+      },
+      {
+        "tick": 67,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 7,
+            "form": "right-leg",
+            "progress": 0.34950772
+          }
+        }
+      },
+      {
+        "tick": 70,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 8,
+            "form": "left-arm",
+            "progress": 0.3441358
+          }
+        }
+      },
+      {
+        "tick": 74,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 9,
+            "form": "right-arm",
+            "progress": 0.35897434
+          }
+        }
+      },
+      {
+        "tick": 84,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 4,
+            "form": "torso",
+            "progress": 0.7222222
+          }
+        }
+      },
+      {
+        "tick": 86,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 5,
+            "form": "head",
+            "progress": 0.7311828
+          }
+        }
+      },
+      {
+        "tick": 87,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 6,
+            "form": "left-leg",
+            "progress": 0.7254522
+          }
+        }
+      },
+      {
+        "tick": 89,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 7,
+            "form": "right-leg",
+            "progress": 0.736287
+          }
+        }
+      },
+      {
+        "tick": 90,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 8,
+            "form": "left-arm",
+            "progress": 0.7299383
+          }
+        }
+      },
+      {
+        "tick": 91,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 9,
+            "form": "right-arm",
+            "progress": 0.7222222
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "titan.morphology",
+            "value": {
+              "Symbol": "titan-avatar"
+            }
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "Transition": {
+            "law": "titan.materialization",
+            "entity": 2,
+            "from": "titan-materializing",
+            "to": "titan-avatar"
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 4,
+            "form": "torso",
+            "progress": 1.0
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 5,
+            "form": "head",
+            "progress": 1.0
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 6,
+            "form": "left-leg",
+            "progress": 1.0
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 7,
+            "form": "right-leg",
+            "progress": 1.0
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 8,
+            "form": "left-arm",
+            "progress": 1.0
+          }
+        }
+      },
+      {
+        "tick": 104,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-biological-materialization",
+            "source": 2,
+            "entity": 9,
+            "form": "right-arm",
+            "progress": 1.0
+          }
+        }
+      },
+      {
+        "tick": 158,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "titan.morphology",
+            "value": {
+              "Symbol": "limb-missing"
+            }
+          }
+        }
+      },
+      {
+        "tick": 158,
+        "event": {
+          "Transition": {
+            "law": "titan.morphology-integrity",
+            "entity": 2,
+            "from": "titan-avatar",
+            "to": "limb-missing"
+          }
+        }
+      },
+      {
+        "tick": 159,
+        "event": {
+          "StateChanged": {
+            "entity": 2,
+            "name": "titan.morphology",
+            "value": {
+              "Symbol": "titan-avatar"
+            }
+          }
+        }
+      },
+      {
+        "tick": 159,
+        "event": {
+          "Transition": {
+            "law": "titan.materialization",
+            "entity": 2,
+            "from": "titan-materializing",
+            "to": "titan-avatar"
+          }
+        }
+      },
+      {
+        "tick": 181,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-regeneration",
+            "source": 2,
+            "entity": 10,
+            "form": "right-arm",
+            "progress": 0.05952381
+          }
+        }
+      },
+      {
+        "tick": 205,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-regeneration",
+            "source": 2,
+            "entity": 10,
+            "form": "right-arm",
+            "progress": 0.3452381
+          }
+        }
+      },
+      {
+        "tick": 237,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-regeneration",
+            "source": 2,
+            "entity": 10,
+            "form": "right-arm",
+            "progress": 0.72619045
+          }
+        }
+      },
+      {
+        "tick": 260,
+        "event": {
+          "Materialized": {
+            "law": "titan.paths-regeneration",
+            "source": 2,
+            "entity": 10,
+            "form": "right-arm",
+            "progress": 1.0
+          }
+        }
+      }
+    ],
+    "eva": null,
+    "titan": {
+      "host": 2,
+      "paths": 3,
+      "trigger_had_injury": true,
+      "trigger_had_intent": true,
+      "trigger_had_power": true,
+      "trigger_had_paths": true,
+      "avatar_materialized": true,
+      "severed_limb": 9,
+      "severed_limb_fell": true,
+      "regenerated_limb": 10,
+      "regeneration_progress": 1.0,
+      "morphology_restored": true
+    },
+    "crossover": null,
+    "acceptance_passed": true
+  }
+}

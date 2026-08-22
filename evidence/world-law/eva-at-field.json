@@ -1,0 +1,538 @@
+{
+  "schema": "pocket3d.playable-world.receipt.v1",
+  "scenario": "eva-at-field",
+  "seed": 7,
+  "ticks": 190,
+  "state_hash": "00c703a156f42df9",
+  "contact_count": 0,
+  "fractured_entities": [],
+  "detached_entities": [],
+  "ignited_entities": [],
+  "extinguished_entities": [],
+  "cooked_entities": [],
+  "charred_entities": [],
+  "water": {
+    "emitted": 0.0,
+    "delivered": 0.0,
+    "delivered_by_entity": [],
+    "last_spray_tick": null,
+    "campfire_douse": {
+      "entities": [
+        0
+      ],
+      "all_extinguished": false,
+      "all_not_burning": false,
+      "reignited_after_spray": [],
+      "post_spray_turns": 0,
+      "required_stability_turns": 180,
+      "passed": false
+    }
+  },
+  "acceptance": {
+    "tree_fractured": false,
+    "fruit_detached": false,
+    "detached_fruit_hit_terrain": false,
+    "fire_changed_reactive_state": false,
+    "spatial_fire_propagated": false,
+    "damp_fuel_resisted_ignition": false,
+    "playable_chain_complete": false
+  },
+  "landmarks": [],
+  "entities": [
+    {
+      "id": 1,
+      "name": "world-law observer",
+      "tags": [
+        "player"
+      ],
+      "position": [
+        -1.5,
+        0.7386196,
+        10.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Kinematic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 2,
+      "name": "evangelion constitution",
+      "tags": [],
+      "position": [
+        -1.0,
+        3.0482652,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Static",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 3,
+      "name": "soul core",
+      "tags": [],
+      "position": [
+        -1.0,
+        3.1482651,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": null,
+      "linear_velocity": null,
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 4,
+      "name": "pilot",
+      "tags": [],
+      "position": [
+        -1.0,
+        1.3482653,
+        0.45
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": null,
+      "linear_velocity": null,
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 5,
+      "name": "opposing identity emitter",
+      "tags": [],
+      "position": [
+        3.2,
+        3.0482652,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": null,
+      "linear_velocity": null,
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 6,
+      "name": "ordinary matter probe",
+      "tags": [
+        "law-probe"
+      ],
+      "position": [
+        2.7999969,
+        3.0482652,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    },
+    {
+      "id": 7,
+      "name": "counterfield matter probe",
+      "tags": [
+        "law-probe"
+      ],
+      "position": [
+        -15.000779,
+        3.0482652,
+        1.1097455
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "body_mode": "Dynamic",
+      "linear_velocity": [
+        -12.95178,
+        0.0,
+        0.22664227
+      ],
+      "attached_to": null,
+      "structure_fraction": null,
+      "temperature_c": null,
+      "moisture": null,
+      "fuel": null,
+      "burning": null,
+      "cooked": null,
+      "charred": null
+    }
+  ],
+  "world_laws": {
+    "schema": "pocket3d.world-law.receipt.v1",
+    "scenario": "eva-at-field",
+    "physics_tick": 190,
+    "law_tick": 191,
+    "state_hash": "61916dc7000e79e5",
+    "hidden_states": [
+      {
+        "key": {
+          "entity": 3,
+          "name": "eva.soul.identity"
+        },
+        "value": {
+          "Scalar": 1.0
+        }
+      },
+      {
+        "key": {
+          "entity": 4,
+          "name": "eva.pilot.sync"
+        },
+        "value": {
+          "Scalar": 0.92
+        }
+      },
+      {
+        "key": {
+          "entity": 5,
+          "name": "eva.identity.active"
+        },
+        "value": {
+          "Flag": true
+        }
+      }
+    ],
+    "relations": [
+      {
+        "key": {
+          "kind": "eva.embodied-by",
+          "from": 3,
+          "to": 2
+        },
+        "strength": 1.0
+      },
+      {
+        "key": {
+          "kind": "eva.synchronized-with",
+          "from": 4,
+          "to": 3
+        },
+        "strength": 0.92
+      }
+    ],
+    "fields": [
+      {
+        "key": {
+          "channel": "eva.identity-boundary",
+          "source": 2
+        },
+        "center": [
+          -1.0,
+          3.0482652,
+          0.0
+        ],
+        "radius": 3.4,
+        "intensity": 846.4,
+        "polarity": 1.0
+      },
+      {
+        "key": {
+          "channel": "eva.identity-boundary",
+          "source": 5
+        },
+        "center": [
+          3.2,
+          3.0482652,
+          0.0
+        ],
+        "radius": 3.0,
+        "intensity": 790.0,
+        "polarity": -1.0
+      }
+    ],
+    "events": [
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 3,
+            "name": "eva.soul.identity",
+            "value": {
+              "Scalar": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 4,
+            "name": "eva.pilot.sync",
+            "value": {
+              "Scalar": 0.92
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "StateChanged": {
+            "entity": 5,
+            "name": "eva.identity.active",
+            "value": {
+              "Flag": false
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "RelationBound": {
+            "relation": {
+              "key": {
+                "kind": "eva.embodied-by",
+                "from": 3,
+                "to": 2
+              },
+              "strength": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "RelationBound": {
+            "relation": {
+              "key": {
+                "kind": "eva.synchronized-with",
+                "from": 4,
+                "to": 3
+              },
+              "strength": 0.92
+            }
+          }
+        }
+      },
+      {
+        "tick": 0,
+        "event": {
+          "FieldChanged": {
+            "field": {
+              "key": {
+                "channel": "eva.identity-boundary",
+                "source": 2
+              },
+              "center": [
+                -1.0,
+                3.0482652,
+                0.0
+              ],
+              "radius": 3.4,
+              "intensity": 920.0,
+              "polarity": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 1,
+        "event": {
+          "FieldChanged": {
+            "field": {
+              "key": {
+                "channel": "eva.identity-boundary",
+                "source": 2
+              },
+              "center": [
+                -1.0,
+                3.0482652,
+                0.0
+              ],
+              "radius": 3.4,
+              "intensity": 846.4,
+              "polarity": 1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 27,
+        "event": {
+          "Projection": {
+            "law": "eva.identity-boundary-projection",
+            "source": 2,
+            "target": 6,
+            "kind": "kinetic-block",
+            "magnitude": 392.0,
+            "position": [
+              2.4,
+              3.0482652,
+              0.0
+            ],
+            "direction": [
+              1.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      },
+      {
+        "tick": 83,
+        "event": {
+          "StateChanged": {
+            "entity": 5,
+            "name": "eva.identity.active",
+            "value": {
+              "Flag": true
+            }
+          }
+        }
+      },
+      {
+        "tick": 84,
+        "event": {
+          "FieldChanged": {
+            "field": {
+              "key": {
+                "channel": "eva.identity-boundary",
+                "source": 5
+              },
+              "center": [
+                3.2,
+                3.0482652,
+                0.0
+              ],
+              "radius": 3.0,
+              "intensity": 790.0,
+              "polarity": -1.0
+            }
+          }
+        }
+      },
+      {
+        "tick": 109,
+        "event": {
+          "Projection": {
+            "law": "eva.identity-boundary-projection",
+            "source": 2,
+            "target": 7,
+            "kind": "kinetic-attenuation",
+            "magnitude": 56.400024,
+            "position": [
+              2.3232079,
+              3.0482652,
+              0.7185318
+            ],
+            "direction": [
+              0.97741425,
+              0.0,
+              0.21133293
+            ]
+          }
+        }
+      }
+    ],
+    "eva": {
+      "pilot": 4,
+      "soul": 3,
+      "unit": 2,
+      "synchronization": 0.92,
+      "field_budget": 846.4,
+      "interference_budget": 790.0,
+      "blocked_projectiles": [
+        6
+      ],
+      "penetrated_projectiles": [
+        7
+      ],
+      "ordinary_matter_blocked": true,
+      "local_interference_observed": true,
+      "interference_enabled_penetration": true
+    },
+    "titan": null,
+    "crossover": null,
+    "acceptance_passed": true
+  }
+}

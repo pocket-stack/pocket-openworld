@@ -135,3 +135,8 @@ cargo run --locked -- --headless --scenario world-law-crossover --ticks 190 \
 
 The JSON proves hidden and visible simulation state; the PNG proves only the
 projection's presentation. Both are required for gameplay acceptance.
+
+The final seed-7, 1440x900 receipts and matching renders are frozen under
+`evidence/world-law/`, together with their generation baseline and SHA-256
+checksums. They preserve the experiment result on its branch independently of
+temporary CI artifact retention.
