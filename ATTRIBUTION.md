@@ -27,6 +27,30 @@ repository and must not be copied into a public repository, release, package,
 or other redistribution channel without separate permission and a copyright
 review.
 
+## World Law character models
+
+The World Law POC includes an adapted **EVANGELION UNIT ONE** model by
+**BROWNCOAT** and an adapted **Colossal Titan** model by **Sidaivan**. Their
+source pages designate both models CC BY 4.0:
+
+- <https://sketchfab.com/3d-models/evangelion-unit-one-07081cd3a70e494095271c43a591af81>
+- <https://sketchfab.com/3d-models/colossal-titan-e031a57fd4bf411f8e893361676b4544>
+
+The EVA source description additionally states `creds` for
+<https://byneet.fanbox.cc/>; that supplied credit is preserved in
+`assets/world-law/model-receipt.json`.
+
+`assets/world-law/import_models.py` changes scale and origin, removes viewer
+helpers, poses and bakes the Titan rig, and splits its screen-right arm by skin
+weights for the fracture/regeneration presentation. The derived GLBs remain
+CC BY 4.0 and are not covered by the surrounding MIT code license. Exact
+source hashes, Objaverse archive paths, output hashes, and geometry bounds are
+recorded in `assets/world-law/model-receipt.json`.
+
+Evangelion and Attack on Titan character designs, names, and associated marks
+remain the property of their respective rights holders. The source model
+licenses do not grant rights beyond the contributors' work.
+
 ## Research boundary
 
 The public [zeldaret/botw](https://github.com/zeldaret/botw) project was

@@ -3,8 +3,13 @@
 This repository contains an original Pocket3D proof of concept for a small
 systemic world. A deterministic simulation owns bodies, attachments,
 structural damage, heat, moisture, fuel, and combustion. The Pocket3D adapter
-maps simulation state to procedural low-poly geometry, particles, lighting,
-a third-person camera, a locally imported rigged Frieren model, and a debug HUD.
+maps simulation state to procedural low-poly environments, attributed character
+models, particles, lighting, a third-person camera, and a debug HUD.
+
+The World Law Lab extends that foundation with renderer-independent hidden
+state, persistent relations, spatial fields, discrete transitions, and
+materialization. Its EVA, Titan, and cross-law experiments are documented in
+[`WORLD_LAWS.md`](WORLD_LAWS.md).
 
 The implementation does not include or derive game assets, source code,
 configuration data, shaders, or numeric tuning from *The Legend of Zelda:
@@ -57,6 +62,38 @@ cargo run --locked -- \
 `--scenario orchard-fire` walks to the tree, chops it, lets attached apples
 become rigid bodies, ignites the fallen wood, and records ordered world events.
 The receipt proves simulation state; the PNG proves the rendered result.
+
+## World Law Lab
+
+Run any chamber interactively; it advances the experiment automatically while
+mouse/arrow input orbits the observer camera and `R` replays the transaction:
+
+```sh
+cargo run --locked -- --scenario eva-at-field
+cargo run --locked -- --scenario titan-paths
+cargo run --locked -- --scenario world-law-crossover
+```
+
+The three chambers respectively prove:
+
+- `Soul -> Identity -> A.T. Field -> ordinary matter blocked`, followed by
+  local opposing-field interference and penetration;
+- `Injury + Intent + Titan Power + Paths -> avatar materialization`, ordinary
+  physical limb fracture/fall, and morphology-driven regeneration;
+- a Titan-biomass sphere/capsule impact interacting with the same field-energy
+  rule, with no crossover-specific branch.
+
+Their fixed-turn headless commands and architecture invariants are in
+[`WORLD_LAWS.md`](WORLD_LAWS.md). Receipts use
+`pocket3d.world-law.receipt.v1`; screenshots remain rendering evidence only.
+
+The chambers render attributed CC BY 4.0 character assets rather than
+procedural stand-ins: BROWNCOAT's EVA Unit-01 model and Sidaivan's Colossal
+Titan model. The Titan adaptation bakes a natural arm pose and splits the
+screen-right arm at its skin weights, so the physical severing, fall, and
+regeneration all use matching model geometry. Source links, exact hashes,
+license boundaries, rebuild commands, and QA previews live in
+`assets/world-law/`.
 
 ## Character asset
 

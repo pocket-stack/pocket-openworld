@@ -96,12 +96,42 @@ the material record and reaction solver without naming those content types.
 The fallen trunk remains a normal body and reactive object. It can roll,
 collide, heat nearby fruit, propagate fire, exhaust its fuel, and cool down.
 
+## World-law composition
+
+`pocket3d-world::WorldLawRuntime` adds renderer-independent hidden values,
+persistent relations, finite spatial fields, deferred transitions and
+projections, snapshots, and deterministic hashes. The reusable runtime does
+not name EVA, Titans, characters, recipes, or scenarios. This application
+defines those law packs and constitutions in `src/law_poc.rs`; the complete
+execution model and acceptance contract are documented in `WORLD_LAWS.md`.
+
+The identity-boundary projection preserves a shared physical invariant: it
+changes only inward normal motion, never creates kinetic energy, and removes no
+more energy than either the incoming body or finite local field budget owns.
+The same projection is validated with sphere and capsule bodies. Opposing
+fields cancel only in their shared spatial volume.
+
+Titan materialization creates ordinary visible entities. A regenerated arm is
+an attached physical body with the same morphology slot as the severed arm;
+the old arm remains a detached dynamic body and falls through the existing
+integration/contact solver. No collision, integration, attachment, structure,
+reaction, or world-law primitive branches on a character, tag, recipe, or
+crossover scenario.
+
 ## Presentation
 
 Environment meshes are generated from mathematical primitives in this
 repository. The scene uses reusable assets with per-instance transforms and
 tints for terrain, trunk, canopy, apple, rock, grass, and shadow discs. Fire
 and embers use the additive sprite pass.
+
+The World Law chambers use separate attributed CC BY 4.0 GLBs for EVA Unit-01,
+the Colossal Titan body, and its screen-right arm. Their Blender import step
+normalizes scale, bakes the Titan's relaxed arm pose, and splits the arm by
+source skin weights. Presentation follows the simulation entities, but asset
+selection does not alter collision, attachment, fracture, field, or world-law
+rules. `assets/world-law/model-receipt.json` fixes source IDs, hashes, geometry
+budgets, and authored bounds.
 
 **The active local character uses Pocket3D's normal glTF skin and clip path.**
 The Frieren importer preserves the downloaded model's 61-joint rig, authored

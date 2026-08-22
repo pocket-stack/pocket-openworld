@@ -1,0 +1,95 @@
+{
+  "outputs": {
+    "colossal-titan-body": {
+      "bytes": 5287864,
+      "file": "colossal-titan-body.glb",
+      "runtime_aabb_m": {
+        "max": [
+          2.0132,
+          10.0,
+          1.49326
+        ],
+        "min": [
+          -2.79272,
+          0.0,
+          -1.49325
+        ]
+      },
+      "sha256": "37ef03b6a5f28729714b41cfb2922c70283caab45f58b4250ab6c2b67d54382a",
+      "triangles": 58103,
+      "vertices": 37348
+    },
+    "colossal-titan-right-arm": {
+      "bytes": 2897028,
+      "file": "colossal-titan-right-arm.glb",
+      "runtime_aabb_m": {
+        "max": [
+          1.00198,
+          0.31086,
+          0.43451
+        ],
+        "min": [
+          -0.23496,
+          -5.05207,
+          -0.51061
+        ]
+      },
+      "sha256": "c40f29bc7bf830d2dfc4b823cb24c5ff42d6fd51eb39f7ebbff4744f47fdb7c9",
+      "triangles": 8427,
+      "vertices": 5174
+    },
+    "eva-unit-01": {
+      "bytes": 1314384,
+      "file": "eva-unit-01.glb",
+      "runtime_aabb_m": {
+        "max": [
+          1.04385,
+          6.0,
+          0.99835
+        ],
+        "min": [
+          -1.04385,
+          0.0,
+          -0.99835
+        ]
+      },
+      "sha256": "c33b65ab80be186295582aa00a38c4b950214ef35212509d2bc3df94b353dce2",
+      "triangles": 25736,
+      "vertices": 32933
+    }
+  },
+  "processing": {
+    "eva_height_m": 6.0,
+    "titan_height_m": 10.0,
+    "titan_right_arm": "posed down, split by Mixamo arm weights, origin at shoulder",
+    "titan_right_shoulder_runtime_m": [
+      1.79075,
+      8.54791,
+      -0.36712
+    ]
+  },
+  "schema": "pocket-openworld-world-law-models-v1",
+  "sources": {
+    "colossal-titan": {
+      "creator": "Sidaivan",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "objaverse_path": "glbs/000-028/e031a57fd4bf411f8e893361676b4544.glb",
+      "page": "https://sketchfab.com/3d-models/colossal-titan-e031a57fd4bf411f8e893361676b4544",
+      "sha256": "db62cec0a2f9c666e589a06dd3e6fde76bf1cf9aac76e9f5fadf2a5b89baf238",
+      "sketchfab_uid": "e031a57fd4bf411f8e893361676b4544",
+      "title": "Colossal Titan"
+    },
+    "eva-unit-01": {
+      "creator": "BROWNCOAT",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "objaverse_path": "glbs/000-017/07081cd3a70e494095271c43a591af81.glb",
+      "page": "https://sketchfab.com/3d-models/evangelion-unit-one-07081cd3a70e494095271c43a591af81",
+      "sha256": "fc6a86ec438b5734d892da66ccb5a5c0419b0c9c2e18ac6f82754b7a51268629",
+      "sketchfab_uid": "07081cd3a70e494095271c43a591af81",
+      "source_page_credit": "https://byneet.fanbox.cc/",
+      "title": "EVANGELION UNIT ONE"
+    }
+  }
+}

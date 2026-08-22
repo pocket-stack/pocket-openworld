@@ -24,6 +24,7 @@ use serde::Serialize;
 use winit::keyboard::KeyCode;
 
 use crate::art;
+use crate::law_poc::{LawPoc, LawPocMode, LawPocReceipt, PocBeam, PocModelKind, PocSprite};
 
 const PLAYER_HEIGHT: f32 = 0.84;
 const MOVE_SPEED: f32 = 3.55;
@@ -579,6 +580,9 @@ struct WorldAssets {
     rock: Arc<ModelAsset>,
     shadow: Arc<ModelAsset>,
     explorer: Arc<ModelAsset>,
+    eva_unit_01: Arc<ModelAsset>,
+    colossal_titan_body: Arc<ModelAsset>,
+    colossal_titan_right_arm: Arc<ModelAsset>,
     explorer_animations: ExplorerAnimations,
     explorer_left_hand: usize,
     explorer_staff_grip: usize,
@@ -626,6 +630,40 @@ impl WorldAssets {
             include_bytes!("../assets/character/frieren.glb"),
             "pocket-openworld frieren.glb",
         )?;
+        let eva_unit_01 = ModelAsset::load_glb_bytes(
+            gpu,
+            layout,
+            samplers,
+            include_bytes!("../assets/world-law/eva-unit-01.glb"),
+            "World Law EVA Unit-01",
+        )?;
+        let colossal_titan_body = ModelAsset::load_glb_bytes(
+            gpu,
+            layout,
+            samplers,
+            include_bytes!("../assets/world-law/colossal-titan-body.glb"),
+            "World Law Colossal Titan body",
+        )?;
+        let colossal_titan_right_arm = ModelAsset::load_glb_bytes(
+            gpu,
+            layout,
+            samplers,
+            include_bytes!("../assets/world-law/colossal-titan-right-arm.glb"),
+            "World Law Colossal Titan right arm",
+        )?;
+        ensure!(
+            eva_unit_01.aabb.0.y.abs() <= 0.02 && (eva_unit_01.aabb.1.y - 6.0).abs() <= 0.02,
+            "World Law EVA asset must be grounded and six metres tall"
+        );
+        ensure!(
+            colossal_titan_body.aabb.0.y.abs() <= 0.02
+                && (colossal_titan_body.aabb.1.y - 10.0).abs() <= 0.02,
+            "World Law Titan body must be grounded and ten metres tall"
+        );
+        ensure!(
+            colossal_titan_right_arm.aabb.0.y < -4.8 && colossal_titan_right_arm.aabb.1.y < 0.5,
+            "World Law Titan arm must be rooted at its shoulder and extend downward"
+        );
         ensure!(
             explorer.clips.len() == 5
                 && ["Idle", "Walk", "Chop", "Cast", "Water"]
@@ -687,6 +725,9 @@ impl WorldAssets {
             rock: upload(art::rock(1.0, 0x8118), "world rock"),
             shadow: upload(art::disc(1.0, 28), "world contact shadow"),
             explorer,
+            eva_unit_01,
+            colossal_titan_body,
+            colossal_titan_right_arm,
             explorer_animations,
             explorer_left_hand,
             explorer_staff_grip,
@@ -879,6 +920,8 @@ pub struct WorldReceipt {
     pub acceptance: AcceptanceReceipt,
     pub landmarks: Vec<TimedEvent>,
     pub entities: Vec<EntityReceipt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub world_laws: Option<LawPocReceipt>,
 }
 
 pub struct WorldGame {
@@ -905,6 +948,7 @@ pub struct WorldGame {
     receipts: RuntimeReceipts,
     last_target: Option<EntityId>,
     seed: u64,
+    law_poc: Option<LawPoc>,
 }
 
 impl WorldGame {
@@ -961,6 +1005,7 @@ impl WorldGame {
             receipts: RuntimeReceipts::default(),
             last_target: None,
             seed,
+            law_poc: None,
         }
     }
 
@@ -1005,7 +1050,43 @@ impl WorldGame {
             acceptance,
             landmarks: self.receipts.landmarks.clone(),
             entities,
+            world_laws: self.law_poc.as_ref().map(|poc| poc.receipt(&self.world)),
         }
+    }
+
+    pub fn prepare_law_poc(&mut self, mode: LawPocMode) {
+        let ground_y = OrchardEnvironment::height_at(Vec2::ZERO);
+        let (world, player, law_poc) =
+            LawPoc::build_world(mode, self.seed, ground_y, PLAYER_HEIGHT);
+        self.world = world;
+        self.ids = WorldIds {
+            player,
+            fire: EntityId(0),
+            trees: Vec::new(),
+            grass: Vec::new(),
+            camp_logs: Vec::new(),
+            damp_log: EntityId(0),
+        };
+        self.decorations.clear();
+        self.receipts = RuntimeReceipts::default();
+        self.pending = PendingActions::default();
+        self.held_apple = None;
+        self.axe_swing_turns = 0;
+        self.ember_cast_turns = 0;
+        self.water_burst_turns = 0;
+        self.water_pose_turns = 0;
+        self.last_target = None;
+        self.message = "World Law Lab transaction running".into();
+        self.message_turns = 150;
+        self.orbit_yaw = 0.16;
+        self.orbit_pitch = -0.16;
+        self.law_poc = Some(law_poc);
+    }
+
+    pub fn law_poc_passed(&self) -> bool {
+        self.law_poc
+            .as_ref()
+            .is_some_and(|poc| poc.receipt(&self.world).acceptance_passed)
     }
 
     pub fn is_holding_apple(&self) -> bool {
@@ -1237,6 +1318,10 @@ impl WorldGame {
     }
 
     fn reset_world(&mut self) {
+        if let Some(mode) = self.law_poc.as_ref().map(LawPoc::mode) {
+            self.prepare_law_poc(mode);
+            return;
+        }
         let (world, ids, decorations) = build_world(self.seed, &self.environment);
         self.world = world;
         self.ids = ids;
@@ -1584,6 +1669,15 @@ impl WorldGame {
     }
 
     fn update_camera(&mut self) {
+        if let Some(poc) = &self.law_poc {
+            let focus = poc.camera_focus();
+            let rotation = Quat::from_rotation_y(self.orbit_yaw)
+                * Quat::from_rotation_x(self.orbit_pitch.clamp(-0.58, 0.22));
+            self.camera.pos = focus
+                + rotation * Vec3::new(0.0, poc.camera_distance() * 0.18, poc.camera_distance());
+            self.camera.look_at(focus);
+            return;
+        }
         let foot = self.player_position() - Vec3::Y * PLAYER_HEIGHT;
         let (position, focus) = player_camera_pose(foot, self.orbit_yaw, self.orbit_pitch);
         self.camera.pos = position;
@@ -1603,6 +1697,13 @@ impl WorldGame {
             Mat4::IDENTITY,
             [1.0, 1.0, 1.0, 1.0],
         ));
+        if self.law_poc.is_some() {
+            self.render_law_poc(&assets, time);
+            self.render_player(&assets, time);
+            self.update_camera();
+            self.update_hud(size);
+            return;
+        }
         for decoration in &self.decorations {
             let (asset, transform, tint) = match decoration.kind {
                 DecorationKind::Grass(id) => {
@@ -1788,6 +1889,45 @@ impl WorldGame {
         self.render_combustion(&assets, time);
         self.update_camera();
         self.update_hud(size);
+    }
+
+    fn render_law_poc(&mut self, assets: &WorldAssets, time: f32) {
+        let Some(poc) = &self.law_poc else {
+            return;
+        };
+        let presentation = poc.presentation(&self.world, time);
+        for model in presentation.models {
+            let asset = match model.kind {
+                PocModelKind::Sphere => &assets.rock,
+                PocModelKind::Cylinder => &assets.trunk,
+                PocModelKind::Disc => &assets.shadow,
+                PocModelKind::EvaUnit01 => &assets.eva_unit_01,
+                PocModelKind::ColossalTitanBody => &assets.colossal_titan_body,
+                PocModelKind::ColossalTitanRightArm => &assets.colossal_titan_right_arm,
+            };
+            let mut instance = art::instance(asset, model.transform, model.tint);
+            instance.lit = if model.lit { 1.0 } else { 0.0 };
+            self.scene.models.push(instance);
+        }
+        self.scene.beams.extend(
+            presentation
+                .beams
+                .into_iter()
+                .map(|PocBeam { a, b, width, color }| Beam { a, b, width, color }),
+        );
+        self.scene
+            .sprites
+            .extend(presentation.sprites.into_iter().map(
+                |PocSprite {
+                     position,
+                     size,
+                     color,
+                 }| Sprite {
+                    pos: position,
+                    size,
+                    color,
+                },
+            ));
     }
 
     fn render_campfire(&mut self, assets: &WorldAssets) {
@@ -2058,6 +2198,81 @@ impl WorldGame {
         self.hud.clear();
         let width = size.0 as f32;
         let height = size.1 as f32;
+        if let Some(poc) = &self.law_poc {
+            let title = poc.title();
+            let subtitle = poc.subtitle();
+            let receipt = poc.receipt(&self.world);
+            self.hud
+                .rect(20.0, 20.0, 610.0, 104.0, [0.025, 0.035, 0.065, 0.86]);
+            self.hud
+                .text(36.0, 34.0, 1.75, [0.74, 0.82, 1.0, 1.0], title);
+            self.hud
+                .text(36.0, 62.0, 1.0, [0.88, 0.91, 1.0, 1.0], &subtitle);
+            self.hud.text(
+                36.0,
+                82.0,
+                1.0,
+                [0.66, 0.72, 0.89, 1.0],
+                "Hidden State -> Relation -> Law -> Projection -> Physics",
+            );
+            self.hud.text(
+                36.0,
+                101.0,
+                1.0,
+                [0.56, 0.65, 0.78, 1.0],
+                &format!(
+                    "physics {:05}  visible {:016x}  hidden {}",
+                    self.world.tick(),
+                    self.world.state_hash(),
+                    receipt.state_hash
+                ),
+            );
+            self.hud
+                .rect(width - 350.0, 20.0, 330.0, 85.0, [0.045, 0.025, 0.07, 0.82]);
+            self.hud.text(
+                width - 334.0,
+                34.0,
+                1.25,
+                if receipt.acceptance_passed {
+                    [0.46, 1.0, 0.58, 1.0]
+                } else {
+                    [1.0, 0.72, 0.22, 1.0]
+                },
+                if receipt.acceptance_passed {
+                    "PHENOMENON PROVEN"
+                } else {
+                    "LAW TRANSACTION RUNNING"
+                },
+            );
+            self.hud.text(
+                width - 334.0,
+                61.0,
+                1.0,
+                [0.82, 0.78, 0.92, 1.0],
+                &format!(
+                    "STATE {}  REL {}  FIELD {}",
+                    receipt.hidden_states.len(),
+                    receipt.relations.len(),
+                    receipt.fields.len()
+                ),
+            );
+            self.hud.text(
+                width - 334.0,
+                80.0,
+                1.0,
+                [0.70, 0.66, 0.83, 1.0],
+                "mouse/arrow orbit  R replay",
+            );
+            self.hud.crosshair(
+                width * 0.5,
+                height * 0.5,
+                5.0,
+                6.0,
+                1.5,
+                [0.82, 0.80, 1.0, 0.56],
+            );
+            return;
+        }
         self.hud
             .rect(20.0, 20.0, 425.0, 102.0, [0.035, 0.075, 0.07, 0.78]);
         self.hud
@@ -2242,6 +2457,18 @@ impl Game for WorldGame {
             self.reset_world();
         }
         self.move_player(input, dt);
+        if let Some(mut law_poc) = self.law_poc.take() {
+            law_poc.pre_step(&mut self.world);
+            let report = self.world.step(&self.environment);
+            law_poc.post_step(&mut self.world, &report);
+            self.receipts.observe(&report, &self.world);
+            self.law_poc = Some(law_poc);
+            self.axe_swing_turns = self.axe_swing_turns.saturating_sub(1);
+            self.ember_cast_turns = self.ember_cast_turns.saturating_sub(1);
+            self.water_burst_turns = self.water_burst_turns.saturating_sub(1);
+            self.message_turns = self.message_turns.saturating_sub(1);
+            return;
+        }
         if std::mem::take(&mut self.pending.chop) {
             self.chop_nearest();
         }

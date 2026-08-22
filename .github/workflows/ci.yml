@@ -65,6 +65,28 @@ jobs:
           --receipt artifacts/campfire-douse.json
           --screenshot artifacts/campfire-douse.png
 
+      - name: Verify EVA identity-field laws
+        run: >-
+          cargo run --locked --package pocket-openworld --
+          --headless --scenario eva-at-field --ticks 190 --seed 7 --size 960x600
+          --receipt artifacts/eva-at-field.json
+          --screenshot artifacts/eva-at-field.png
+
+      - name: Verify Titan Paths laws
+        run: >-
+          cargo run --locked --package pocket-openworld --
+          --headless --scenario titan-paths --ticks 300 --seed 7 --size 960x600
+          --receipt artifacts/titan-paths.json
+          --screenshot artifacts/titan-paths.png
+
+      - name: Verify cross-law interaction
+        run: >-
+          cargo run --locked --package pocket-openworld --
+          --headless --scenario world-law-crossover --ticks 190 --seed 7
+          --size 960x600
+          --receipt artifacts/world-law-crossover.json
+          --screenshot artifacts/world-law-crossover.png
+
       - name: Upload acceptance evidence
         if: always()
         uses: actions/upload-artifact@v7

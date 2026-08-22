@@ -2,11 +2,13 @@
 
 mod art;
 mod game;
+mod law_poc;
 
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail, ensure};
 use game::{WorldGame, apply_campfire_douse_script, apply_carry_script, apply_orchard_script};
+use law_poc::LawPocMode;
 use pocket3d::app::{AppConfig, Game};
 use pocket3d::gpu::{Gpu, OFFSCREEN_FORMAT, OffscreenTarget};
 use pocket3d::input::Input;
@@ -24,12 +26,18 @@ const SCENARIOS: &[&str] = &[
     "grass-fire",
     "grass-burnout",
     "campfire-douse",
+    "eva-at-field",
+    "titan-paths",
+    "world-law-crossover",
 ];
 const CHARACTER_CARRY_CAPTURE_TICK: u64 = 360;
 const CHARACTER_CAST_CAPTURE_TICK: u64 = 24;
 const CHARACTER_WATER_CAPTURE_TICK: u64 = 47;
 const GRASS_FIRE_CAPTURE_TICK: u64 = 48;
 const GRASS_BURNOUT_CAPTURE_TICK: u64 = 210;
+const EVA_AT_FIELD_CAPTURE_TICK: u64 = 190;
+const TITAN_PATHS_CAPTURE_TICK: u64 = 300;
+const CROSSOVER_CAPTURE_TICK: u64 = 190;
 
 #[derive(Debug)]
 struct Args {
@@ -62,6 +70,10 @@ fn main() -> Result<()> {
     if args.headless || args.screenshot.is_some() || args.receipt.is_some() {
         run_headless(args)
     } else {
+        let mut game = WorldGame::new(args.seed);
+        if let Some(mode) = LawPocMode::from_scenario(&args.scenario) {
+            game.prepare_law_poc(mode);
+        }
         pocket3d::app::run(
             AppConfig {
                 title: "Pocket3D — Reactive Orchard".into(),
@@ -71,7 +83,7 @@ fn main() -> Result<()> {
                 max_fps: Some(60.0),
                 ..Default::default()
             },
-            WorldGame::new(args.seed),
+            game,
         )
     }
 }
@@ -115,9 +127,25 @@ fn run_headless(args: Args) -> Result<()> {
             "grass-burnout requires --ticks {GRASS_BURNOUT_CAPTURE_TICK} so the captured frame proves persistent collapsed char"
         );
     }
+    let law_capture_tick = match LawPocMode::from_scenario(&args.scenario) {
+        Some(LawPocMode::EvaAtField) => Some(EVA_AT_FIELD_CAPTURE_TICK),
+        Some(LawPocMode::TitanPaths) => Some(TITAN_PATHS_CAPTURE_TICK),
+        Some(LawPocMode::Crossover) => Some(CROSSOVER_CAPTURE_TICK),
+        None => None,
+    };
+    if let Some(capture_tick) = law_capture_tick {
+        ensure!(
+            args.ticks == capture_tick,
+            "{} requires --ticks {capture_tick} so state and rendering evidence capture the same completed phenomenon",
+            args.scenario
+        );
+    }
     let gpu = Gpu::new_headless()?;
     let mut renderer = Renderer::new(&gpu, OFFSCREEN_FORMAT)?;
     let mut game = WorldGame::new(args.seed);
+    if let Some(mode) = LawPocMode::from_scenario(&args.scenario) {
+        game.prepare_law_poc(mode);
+    }
     game.init(&gpu, &mut renderer)?;
     if args.scenario == "campfire-douse" {
         game.prepare_campfire_douse_scenario();
@@ -200,10 +228,25 @@ fn run_headless(args: Args) -> Result<()> {
             receipt.water.campfire_douse
         );
     }
-    println!(
-        "pocket-openworld: {} turns, state {}, systemic acceptance {}",
-        receipt.ticks, receipt.state_hash, receipt.acceptance.playable_chain_complete
-    );
+    if LawPocMode::from_scenario(&args.scenario).is_some() {
+        ensure!(
+            game.law_poc_passed(),
+            "{} acceptance failed: {:#?}",
+            args.scenario,
+            receipt.world_laws
+        );
+    }
+    if let Some(laws) = &receipt.world_laws {
+        println!(
+            "pocket-openworld: {} turns, visible {}, hidden {}, world-law acceptance {}",
+            receipt.ticks, receipt.state_hash, laws.state_hash, laws.acceptance_passed
+        );
+    } else {
+        println!(
+            "pocket-openworld: {} turns, state {}, systemic acceptance {}",
+            receipt.ticks, receipt.state_hash, receipt.acceptance.playable_chain_complete
+        );
+    }
     Ok(())
 }
 
@@ -245,7 +288,7 @@ fn parse_args() -> Result<Args> {
             }
             "-h" | "--help" => {
                 println!(
-                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-cast|character-carry|character-water|grass-fire|grass-burnout|campfire-douse\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
+                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-cast|character-carry|character-water|grass-fire|grass-burnout|campfire-douse|eva-at-field|titan-paths|world-law-crossover\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
                 );
                 std::process::exit(0);
             }
@@ -306,6 +349,7 @@ fn apply_scenario_script(input: &mut Input, scenario: &str, turn: u64) {
             }
         }
         "campfire-douse" => apply_campfire_douse_script(input, turn),
+        "eva-at-field" | "titan-paths" | "world-law-crossover" => {}
         "idle" => {}
         _ => unreachable!("scenario was validated before playback"),
     }
@@ -526,5 +570,103 @@ mod tests {
             staff_weighted_vertices >= 100,
             "staff geometry is no longer rigidly bound to staff.R: {staff_weighted_vertices} vertices"
         );
+    }
+
+    #[test]
+    fn world_law_models_are_grounded_attributed_runtime_assets() {
+        struct Stats {
+            triangles: usize,
+            vertices: usize,
+            min_y: f32,
+            max_y: f32,
+            images: usize,
+        }
+
+        fn inspect(bytes: &[u8], label: &str) -> Stats {
+            let gltf = gltf::Gltf::from_slice(bytes).expect("World Law GLB must parse");
+            assert!(gltf.blob.is_some(), "{label} must be self-contained");
+            assert!(
+                gltf.buffers()
+                    .all(|buffer| matches!(buffer.source(), buffer::Source::Bin)),
+                "{label} must embed every buffer"
+            );
+            assert_eq!(gltf.animations().count(), 0, "{label} must be static");
+            assert_eq!(gltf.skins().count(), 0, "{label} must have its pose baked");
+
+            let (document, buffers, _) =
+                gltf::import_slice(bytes).expect("World Law GLB payload must import");
+            let mut triangles = 0;
+            let mut vertices = 0;
+            let mut min_y = f32::INFINITY;
+            let mut max_y = f32::NEG_INFINITY;
+            for primitive in document.meshes().flat_map(|mesh| mesh.primitives()) {
+                assert_eq!(primitive.mode(), mesh::Mode::Triangles);
+                let reader = primitive
+                    .reader(|buffer| buffers.get(buffer.index()).map(|data| data.0.as_slice()));
+                let positions: Vec<_> = reader
+                    .read_positions()
+                    .expect("World Law primitive must have positions")
+                    .collect();
+                vertices += positions.len();
+                for position in positions {
+                    min_y = min_y.min(position[1]);
+                    max_y = max_y.max(position[1]);
+                }
+                triangles += reader
+                    .read_indices()
+                    .map_or(vertices / 3, |indices| indices.into_u32().count() / 3);
+            }
+            Stats {
+                triangles,
+                vertices,
+                min_y,
+                max_y,
+                images: document.images().count(),
+            }
+        }
+
+        let eva = inspect(
+            include_bytes!("../assets/world-law/eva-unit-01.glb"),
+            "EVA Unit-01",
+        );
+        assert!((24_000..=28_000).contains(&eva.triangles));
+        assert!(
+            (30_000..=70_000).contains(&eva.vertices),
+            "EVA vertex budget changed: {}",
+            eva.vertices
+        );
+        assert!(eva.min_y.abs() <= 0.01 && (eva.max_y - 6.0).abs() <= 0.01);
+
+        let titan_body = inspect(
+            include_bytes!("../assets/world-law/colossal-titan-body.glb"),
+            "Colossal Titan body",
+        );
+        assert!((55_000..=60_000).contains(&titan_body.triangles));
+        assert!(titan_body.min_y.abs() <= 0.01 && (titan_body.max_y - 10.0).abs() <= 0.01);
+        assert_eq!(
+            titan_body.images, 3,
+            "Titan body textures must stay embedded"
+        );
+
+        let titan_arm = inspect(
+            include_bytes!("../assets/world-law/colossal-titan-right-arm.glb"),
+            "Colossal Titan right arm",
+        );
+        assert!((7_500..=9_500).contains(&titan_arm.triangles));
+        assert!((-5.1..=-4.9).contains(&titan_arm.min_y));
+        assert!((0.2..=0.5).contains(&titan_arm.max_y));
+        assert_eq!(titan_arm.images, 2, "Titan arm textures must stay embedded");
+
+        let attribution = include_str!("../assets/world-law/model-receipt.json");
+        for required in [
+            "07081cd3a70e494095271c43a591af81",
+            "e031a57fd4bf411f8e893361676b4544",
+            "CC BY 4.0",
+        ] {
+            assert!(
+                attribution.contains(required),
+                "model receipt lost attribution field {required}"
+            );
+        }
     }
 }
