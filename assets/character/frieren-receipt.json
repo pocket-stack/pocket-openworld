@@ -1,0 +1,102 @@
+{
+  "animations": {
+    "Cast": {
+      "frames": [
+        1.0,
+        24.0
+      ],
+      "loop": false
+    },
+    "Chop": {
+      "frames": [
+        1.0,
+        36.0
+      ],
+      "loop": false
+    },
+    "Idle": {
+      "frames": [
+        1.0,
+        48.0
+      ],
+      "loop": true
+    },
+    "Walk": {
+      "frames": [
+        1.0,
+        33.0
+      ],
+      "loop": true
+    },
+    "Water": {
+      "frames": [
+        1.0,
+        28.0
+      ],
+      "loop": false
+    }
+  },
+  "motion": {
+    "coordinate_system": {
+      "forward": "-Y",
+      "lateral": "+X",
+      "up": "+Z"
+    },
+    "head_relative_forward_range_m": 0.0263,
+    "head_relative_lateral_range_m": 0.0117,
+    "head_vertical_range_m": 0.0298,
+    "hips_lateral_range_m": 0.036,
+    "hips_vertical_range_m": 0.02851,
+    "idle_foot_stagger_m": 0.09916,
+    "idle_staff_grip_lateral_m": 0.25421,
+    "idle_staff_tip_height_m": 0.08286,
+    "idle_staff_vertical_slope": -0.63949,
+    "left_ankle_pitch_range_deg": 50.41205,
+    "left_foot_forward_range_m": 0.55939,
+    "left_foot_lateral_range_m": 0.03738,
+    "left_hand_forward_range_m": 0.40481,
+    "right_ankle_pitch_range_deg": 51.92612,
+    "right_foot_forward_range_m": 0.55449,
+    "right_foot_lateral_range_m": 0.03613,
+    "right_hand_forward_range_m": 0.33896,
+    "shoulder_counter_roll_range_deg": 5.16112,
+    "shoulder_counter_twist_range_deg": 7.95143,
+    "support_sole_max_error_m": 0.0,
+    "torso_forward_lean_max_deg": 7.18722,
+    "torso_forward_lean_min_deg": 3.93386,
+    "torso_forward_lean_range_deg": 3.25336,
+    "water_staff_forward_alignment": 0.99265,
+    "water_staff_tip_height_m": 1.00271,
+    "water_staff_vertical_slope": -0.04415
+  },
+  "output": {
+    "bytes": 1227860,
+    "glb": "frieren.glb",
+    "sha256": "742643d99829e6a98bd148b9c200acb7eee5b1ad98ea1c55a6d1cb26878b4b48"
+  },
+  "rig": {
+    "bones": 62,
+    "meshes": [
+      "body",
+      "face",
+      "hair",
+      "staff"
+    ],
+    "required_socket": "hand.L",
+    "staff_tip_socket": "staff.tip",
+    "staff_tip_world_m": [
+      -0.58377,
+      -0.96913,
+      1.15998
+    ],
+    "tool_bone": "staff.R",
+    "triangles": 7175,
+    "vertices": 3996
+  },
+  "schema": "pocket-openworld-local-character-v1",
+  "source": {
+    "local_filename": "frieren model.blend",
+    "page": "https://booth.pm/ja/items/5469071",
+    "sha256": "e824f953bacc6eba2dcf4497c30b0cd504ddc2347bc706e2f92efc0b429c93fb"
+  }
+}
