@@ -103,37 +103,48 @@ repository. The scene uses reusable assets with per-instance transforms and
 tints for terrain, trunk, canopy, apple, rock, grass, and shadow discs. Fire
 and embers use the additive sprite pass.
 
-**The character uses Pocket3D's normal glTF skin and clip path.** The
-clean-room Blender generator owns the chibi geometry, 23-joint rig, materials
-and seven actions. It never opens a downloaded character asset. Boot vertices
-are measured after skinning while authoring grounded clips. Water outlet
-samples are exported by the same generator for CPU-only tests; the renderer
-samples `staff.R` and `staff.tip` from the actual GLB pose.
+**The active local character uses Pocket3D's normal glTF skin and clip path.**
+The Frieren importer preserves the downloaded model's 61-joint rig, authored
+texture, hair, hands, and staff, adds a `staff.tip` socket, then authors `Idle`,
+`Walk`, `Chop`, `Cast`, and `Water` actions. The self-contained GLB is embedded
+in the executable and loaded through `ModelAsset`; the application does not
+define a second animation renderer.
 
-**The engine owns locomotion.** `Locomotion` is an optional component on a
-kinematic sphere/capsule. Application code submits camera-relative direction,
-surface-space climb axes, held grip and an edge-triggered jump. `World::step`
-queries contacts, applies the slope limit, projects tangential movement,
-maintains a surface anchor, pays stamina and applies gravity after release.
-Motor input, configuration and state are part of snapshot/hash replay.
+The simulation places the player capsule center at `ground + PLAYER_HEIGHT`.
+The presentation transform separately maps the model's authored rest-pose
+minimum Y to the sampled terrain height. **The collision origin stays at the
+capsule center while the rendered feet stay on the ground plane.** Camera focus
+is derived from that visual foot position.
 
-The grip invariant is material support acceleration >= tangential gravity.
-Surface friction and retained moisture determine support; excessive heat
-prevents gripping. The engine never consults application tags, tree roots,
-scenario names or character identity. The app retains controls, the orchard
-and hill recipes, animation selection and scenario receipts.
+Animation selection is deterministic: staff strike overrides water casting,
+which overrides ember casting, walking, and idle in that order. The staff is
+part of the same skin and is rigidly weighted to `staff.R`, so hand, forearm,
+upper-arm, and staff motion share one sampled pose.
 
-On walkable ground, visual soles are offset from the authoritative capsule
-center. During climbing the visual basis follows the contact tangent and
-normal; the physics capsule remains upright. Climbing reserves both hands and cancels staff actions. Otherwise priority is
-staff strike, water, ember, airborne, walk and idle.
-The staff stays on the same skin, and climbing moves its bone to a back carry.
-Apples still use the `hand.L` socket and a 10 cm render/collision diameter.
-
-Canopy fading is a presentation policy. A reusable Pocket3D finite-segment
-bounds query identifies camera occlusion; instance opacity uses the blended
-render pass without writing depth. Physics and reactions retain the canopy's
-ordinary source entities and collider data.
+The walk clip hinges limbs about the character's anatomical left-right world
+axis instead of the source bones' rolled local X axes. Its eight contact,
+down, passing, and up poses move each ankle through heel strike, planted
+loading, toe-off, and dorsiflexed swing clearance. Each authored support pose
+measures the four-weight skinned boot and adjusts the pelvis until its sole
+meets the ground plane. The poses also add support-side pelvis translation,
+pelvis yaw/roll, and a distributed lumbar/thoracic curve: the shoulders stay
+ahead of the pelvis, flex farther forward under load, and recover during the up
+pose while the head counter-rotates to stabilize the gaze. Both arms swing
+opposite their corresponding legs, with elbow flex and a reduced staff-side
+arc. Runtime walk phase advances from actual horizontal displacement at 2.75
+radians per metre, so collision, terrain, and boundary corrections cannot
+leave the feet cycling faster than the player moves. The validation receipt
+requires at least 40 cm fore-aft foot travel, 35 degrees of ankle pitch travel,
+support-sole error below 6 mm, 20 cm fore-aft hand travel on each side,
+2.5–5.5 cm vertical and 2.5–4.5 cm lateral hip travel, upper-body response in
+three axes, 3–10 degrees of forward torso lean with at least 2 degrees of
+flexion/recovery, and 6–12 degrees of shoulder-versus-pelvis counter-twist.
+Idle additionally requires at least 7 cm of foot stagger and
+constrains the staff grip and tip outside the skirt at a grounded downward
+angle. Water rendering and hit testing both sample the
+animated `staff.R` and `staff.tip` transforms from that same pose. Procedural
+fruit uses meter-scale constants: apples render and collide at a 10 cm
+diameter, independent of tree variation.
 
 Grass patches are world entities rather than render-only decoration. Their
 moisture, fuel, ignition, heat transfer, charring, dousing, and burnout all use

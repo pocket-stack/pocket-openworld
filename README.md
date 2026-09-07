@@ -4,7 +4,7 @@ This repository contains an original Pocket3D proof of concept for a small
 systemic world. A deterministic simulation owns bodies, attachments,
 structural damage, heat, moisture, fuel, and combustion. The Pocket3D adapter
 maps simulation state to procedural low-poly geometry, particles, lighting,
-a third-person camera, a clean-room chibi Frieren model, and a debug HUD.
+a third-person camera, a locally imported rigged Frieren model, and a debug HUD.
 
 The implementation does not include or derive game assets, source code,
 configuration data, shaders, or numeric tuning from *The Legend of Zelda:
@@ -30,8 +30,7 @@ by the application; engine changes remain owned by the PocketJS repository.**
 
 Controls:
 
-- `WASD` moves Frieren. Hold `C` at a trunk or steep slope to grip; `WASD` then climbs up/down or traverses sideways. Release `C` to let go and free the staff hand.
-- `Left Shift` jumps from the ground or away from the climbed surface. Stamina recovers on walkable ground; wet or hot surfaces may not support a grip.
+- `WASD` moves Frieren.
 - Mouse movement or arrow keys orbit the camera.
 - `Space` performs a staff strike at the nearest tree or log.
 - `F` plays the staff-casting animation and casts an ember at the aimed
@@ -61,43 +60,40 @@ The receipt proves simulation state; the PNG proves the rendered result.
 
 ## Character asset
 
-The checked-in `assets/character/frieren-chibi.glb` is authored from scratch in
-Blender: approximately 2.5 heads tall, silver twin tails, pointed ears, jade
-eyes, an ivory/gold coat and a garnet staff. Its geometry, 23-joint rig,
-materials and animation are generated without loading the previous model,
-texture or skeleton. Normal builds need no Blender or asset download.
+The complete derived runtime asset is checked into this repository. A fresh
+clone receives `assets/character/frieren.glb`, its nine QA previews, the
+machine-readable receipt, and the importer; normal builds do not need Blender,
+a BOOTH account, or the original `.blend` file.
 
-The `Idle`, `Walk`, `Chop`, `Cast`, and `Water` interaction clips remain;
-`Climb` and `Fall` add traversal poses. `hand.L`, `staff.R`, and `staff.tip`
-retain their pickup, grip and water-outlet contracts. Climbing stows the staff
-on the back. Walk and climb cycle phases follow actual movement distance.
+The active local character is generated from dedastore's free BOOTH
+`frieren (.fbx .blend)` download. The importer preserves its 61-joint skin and
+adds one staff-tip socket. The runtime selects five named glTF clips:
 
-Regenerate the editable `.blend`, GLB, socket samples, receipt and nine previews:
+- `Idle` is a looping at-ease stance with staggered feet and the staff resting
+  outside the skirt silhouette.
+- `Walk` is an eight-phase game-style stride with planted-foot compression,
+  heel strike, toe-off, swing-foot clearance, planted-foot grounding, lateral
+  weight transfer, pelvis rotation, counter-rotating shoulders, contralateral
+  arm swing with elbow flex, load-responsive lumbar/thoracic flexion, head
+  stabilization, and footfall phase tied to actual distance travelled.
+- `Chop` is a non-looping staff strike and recovery.
+- `Cast` is selected by the `F` ember action.
+- `Water` is selected by the `Q` water action.
+
+To reproduce or modify the derived files, first obtain the source model from
+BOOTH and regenerate the embedded runtime GLB, nine studio previews, and
+machine-readable validation receipt with:
 
 ```sh
 /Applications/Blender.app/Contents/MacOS/Blender \
-  --background --factory-startup --python-exit-code 1 --python assets/character/generate_chibi.py
+  --background --factory-startup \
+  --python assets/character/import_frieren.py -- \
+  --source "/Users/evan/Downloads/friren_1.1/frieren model.blend"
 ```
 
-See [character provenance](assets/character/README.md) and [attribution](ATTRIBUTION.md).
-
-## Climbing acceptance
-
-The hill east of the orchard contains walkable ground and steep faces. Trees
-and the hill use the same upstream contact motor; no tree positions or terrain
-heights are used to move the player in application code. Wetness and heat affect
-grip through the existing reactive state. Tree canopies become translucent
-when their bounds obstruct the camera's view of the character.
-
-```sh
-python3 tools/verify_traversal.py --binary target/debug/pocket-openworld
-```
-
-This runs climbing, sideways traversal, release, slopes, action poses, apple
-carrying and sustained extinguishing with JSON and PNG evidence under
-`evidence/chibi-climbing/`. The receipts track support normals, locomotion
-modes, height and stamina. These are desktop/headless receipts, not physical
-handheld-device acceptance.
+The BOOTH page does not provide an explicit redistribution license. The source
+and derived model bytes are not covered by this repository's MIT license; see
+`ATTRIBUTION.md` and `assets/character/README.md` before publishing them.
 
 ## Character acceptance
 
@@ -146,8 +142,8 @@ cargo run --locked -- \
 ```
 
 `cargo test --locked --package pocket-openworld` also parses the local GLB and
-checks the seven clip names, required joints, skinned primitives, authored
-materials, triangle budget, animation priority, camera target, foot-to-ground
+checks the five clip names, required joints, skinned primitives, embedded
+texture, triangle budget, animation priority, camera target, foot-to-ground
 transform, hand socket, staff binding, and water corridor. The
 `character-cast`, `character-carry`, `character-water`, `grass-fire`, and
 `grass-burnout` runs also fail unless their intended live or persistent state
