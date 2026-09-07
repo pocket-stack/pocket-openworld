@@ -1,0 +1,60 @@
+{
+  "schema": "pocket-openworld.clean-room-character.v1",
+  "generator": "generate_chibi.py",
+  "source_inputs": [
+    "generate_chibi.py",
+    "generate_character.py (repository-owned primitive helpers only)"
+  ],
+  "external_assets_read": [],
+  "blender": "5.1.2",
+  "triangles": 10914,
+  "materials": 10,
+  "primitives": 12,
+  "bones": 23,
+  "body_height_m": 1.78,
+  "head_height_m": 0.7,
+  "head_count": 2.542857142857143,
+  "clips": {
+    "Idle": {
+      "frames": 61,
+      "duration_s": 2.0,
+      "hand_travel_m": 0.01675614944263565
+    },
+    "Walk": {
+      "frames": 33,
+      "duration_s": 1.0666666666666667,
+      "hand_travel_m": 0.2117834362231147
+    },
+    "Chop": {
+      "frames": 31,
+      "duration_s": 1.0,
+      "hand_travel_m": 0.3643509883702276
+    },
+    "Cast": {
+      "frames": 31,
+      "duration_s": 1.0,
+      "hand_travel_m": 0.3475830000203973
+    },
+    "Water": {
+      "frames": 31,
+      "duration_s": 1.0,
+      "hand_travel_m": 0.3475830000203973
+    },
+    "Climb": {
+      "frames": 41,
+      "duration_s": 1.3333333333333333,
+      "hand_travel_m": 0.1641275774939209
+    },
+    "Fall": {
+      "frames": 31,
+      "duration_s": 1.0,
+      "hand_travel_m": 0.013580662208760018
+    }
+  },
+  "sockets": [
+    "hand.L",
+    "staff.R",
+    "staff.tip"
+  ],
+  "sha256": "184852c789879876fd8cf02cc379c7b6f21c827b9ac47e8e19fec336f879df6d"
+}

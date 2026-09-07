@@ -3,10 +3,10 @@ use std::f32::consts::{FRAC_PI_2, TAU};
 use std::sync::Arc;
 
 use anyhow::{Context, Result, ensure};
-use glam::{Mat4, Quat, Vec2, Vec3};
+use glam::{Mat3, Mat4, Quat, Vec2, Vec3};
 use pocket3d::anim::AnimState;
 use pocket3d::app::Game;
-use pocket3d::camera::Camera;
+use pocket3d::camera::{Camera, segment_intersects_bounds};
 use pocket3d::gpu::Gpu;
 use pocket3d::hud::Hud;
 use pocket3d::input::Input;
@@ -17,8 +17,8 @@ use pocket3d::scene::{
 };
 use pocket3d_world::{
     Attachment, Body, BodyMode, Collider, EntityBundle, EntityId, Environment, EnvironmentSample,
-    Interaction, PhysicalSurface, ReactiveMaterial, ReactiveState, StepReport, Structure,
-    Transform, World, WorldEvent,
+    Interaction, Locomotion, LocomotionInput, LocomotionMode, PhysicalSurface, ReactiveMaterial,
+    ReactiveState, StepReport, Structure, Transform, World, WorldEvent,
 };
 use serde::Serialize;
 use winit::keyboard::KeyCode;
@@ -26,7 +26,6 @@ use winit::keyboard::KeyCode;
 use crate::art;
 
 const PLAYER_HEIGHT: f32 = 0.84;
-const MOVE_SPEED: f32 = 3.55;
 const WALK_PHASE_RADIANS_PER_METER: f32 = 2.75;
 const CHOP_REACH: f32 = 2.55;
 const ACTION_REACH: f32 = 4.6;
@@ -47,7 +46,7 @@ const CAMPFIRE_DOUSE_STABILITY_TURNS: u64 = 180;
 const APPLE_RADIUS_M: f32 = 0.05;
 const APPLE_HALF_HEIGHT_M: f32 = 0.055;
 const APPLE_LEAF_SCALE_M: Vec3 = Vec3::new(0.025, 0.06, 0.015);
-const HELD_APPLE_SOCKET_OFFSET: Vec3 = Vec3::new(0.0, 0.035, 0.0);
+const HELD_APPLE_SOCKET_OFFSET: Vec3 = Vec3::new(0.0, 0.035, -0.10);
 const HELD_APPLE_ATTACHMENT_OFFSET: Vec3 = Vec3::new(0.37, 0.05, -0.22);
 const GRASS_INITIAL_FUEL: f32 = 0.24;
 const GRASS_TUFTS_PER_PATCH: u32 = 13;
@@ -62,6 +61,8 @@ enum ExplorerAction {
     Chop,
     Cast,
     Water,
+    Climb,
+    Fall,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -71,6 +72,9 @@ struct ExplorerAnimations {
     chop: usize,
     cast: usize,
     water: usize,
+    climb: usize,
+    fall: usize,
+    climb_duration: f32,
     walk_duration: f32,
     chop_duration: f32,
     cast_duration: f32,
@@ -86,18 +90,24 @@ struct ExplorerPose {
 #[derive(Clone, Copy, Debug, Default)]
 struct ExplorerActionState {
     moving: bool,
+    climbing: bool,
+    falling: bool,
     chop_turns: u16,
     ember_cast_turns: u16,
     water_burst_turns: u16,
 }
 
 fn explorer_action(state: ExplorerActionState) -> ExplorerAction {
-    if state.chop_turns > 0 {
+    if state.climbing {
+        ExplorerAction::Climb
+    } else if state.chop_turns > 0 {
         ExplorerAction::Chop
     } else if state.water_burst_turns > 0 {
         ExplorerAction::Water
     } else if state.ember_cast_turns > 0 {
         ExplorerAction::Cast
+    } else if state.falling {
+        ExplorerAction::Fall
     } else if state.moving {
         ExplorerAction::Walk
     } else {
@@ -113,6 +123,18 @@ fn explorer_animation(
     state: ExplorerActionState,
 ) -> AnimState {
     match action {
+        ExplorerAction::Climb => AnimState {
+            clip: animations.climb,
+            time: walk_phase.rem_euclid(TAU) / TAU * animations.climb_duration,
+            speed: 1.0,
+            looping: true,
+        },
+        ExplorerAction::Fall => AnimState {
+            clip: animations.fall,
+            time: scene_time,
+            speed: 1.0,
+            looping: true,
+        },
         ExplorerAction::Idle => AnimState {
             clip: animations.idle,
             time: scene_time,
@@ -192,7 +214,7 @@ fn grounded_explorer_transform(player: Transform, model_min_y: f32) -> Mat4 {
         ground_height - model_min_y * player.scale.y,
         player.position.z,
     );
-    // The BOOTH source faces Blender -Y, which becomes glTF +Z. Pocket3D's
+    // The clean-room Blender asset faces -Y, which becomes glTF +Z. Pocket3D's
     // character-forward convention is -Z, so apply one asset-level half turn
     // while preserving the authoritative player transform.
     Mat4::from_scale_rotation_translation(
@@ -284,45 +306,30 @@ fn staff_water_jet(explorer: Mat4, grip: Mat4, tip: Mat4) -> WaterJet {
 }
 
 /// CPU-only scenarios cannot instantiate GPU model assets. These authored
-/// Water-clip keys preserve the same staff-tip contract in headless receipts:
+/// Blender-generated Water-clip socket samples preserve the same staff-tip contract in headless receipts:
 /// meters in the corrected Pocket3D character space, interpolated by turns.
 fn fallback_staff_water_jet(player: Transform, turns: u16) -> WaterJet {
-    const KEYS: [(f32, Vec3, Vec3); 5] = [
-        (
-            0.0,
-            Vec3::new(0.332, 0.774, -1.006),
-            Vec3::new(0.082, 0.059, -0.995),
-        ),
-        (
-            5.0 / 27.0,
-            Vec3::new(0.622, 0.898, -0.967),
-            Vec3::new(0.101, -0.018, -0.995),
-        ),
-        (
-            11.0 / 27.0,
-            Vec3::new(0.696, 1.003, -0.964),
-            Vec3::new(0.113, -0.044, -0.993),
-        ),
-        (
-            19.0 / 27.0,
-            Vec3::new(0.667, 0.974, -0.967),
-            Vec3::new(0.107, -0.012, -0.994),
-        ),
-        (
-            1.0,
-            Vec3::new(0.332, 0.774, -1.006),
-            Vec3::new(0.082, 0.059, -0.995),
-        ),
-    ];
+    #[derive(serde::Deserialize)]
+    struct SocketKey {
+        time: f32,
+        tip: [f32; 3],
+        direction: [f32; 3],
+    }
+    static KEYS: std::sync::OnceLock<Vec<SocketKey>> = std::sync::OnceLock::new();
+    let keys = KEYS.get_or_init(|| {
+        serde_json::from_str(include_str!("../assets/character/chibi-water-sockets.json"))
+            .expect("generated socket samples")
+    });
     let progress = 1.0 - turns.min(WATER_BURST_TURNS) as f32 / WATER_BURST_TURNS as f32;
-    let pair = KEYS
+    let pair = keys
         .windows(2)
-        .find(|pair| progress <= pair[1].0)
-        .unwrap_or(&KEYS[KEYS.len() - 2..]);
-    let span = (pair[1].0 - pair[0].0).max(f32::EPSILON);
-    let alpha = ((progress - pair[0].0) / span).clamp(0.0, 1.0);
-    let local_tip = pair[0].1.lerp(pair[1].1, alpha);
-    let local_direction = pair[0].2.lerp(pair[1].2, alpha).normalize_or(Vec3::NEG_Z);
+        .find(|p| progress <= p[1].time)
+        .unwrap_or(&keys[keys.len() - 2..]);
+    let alpha = ((progress - pair[0].time) / (pair[1].time - pair[0].time)).clamp(0.0, 1.0);
+    let local_tip = Vec3::from_array(pair[0].tip).lerp(Vec3::from_array(pair[1].tip), alpha);
+    let local_direction = Vec3::from_array(pair[0].direction)
+        .lerp(Vec3::from_array(pair[1].direction), alpha)
+        .normalize_or(Vec3::NEG_Z);
     let ground = player.position.y - PLAYER_HEIGHT * player.scale.y;
     let explorer = Mat4::from_scale_rotation_translation(
         player.scale,
@@ -521,7 +528,10 @@ impl OrchardEnvironment {
     pub fn height_at(position: Vec2) -> f32 {
         let broad = (position.x * 0.105).sin() * 0.28 + (position.y * 0.082 + 0.7).cos() * 0.22;
         let detail = (position.x * 0.31 + position.y * 0.23).sin() * 0.065;
-        broad + detail - 0.12
+        let ramp = ((4.0 - position.y) / 5.0).clamp(0.0, 1.0);
+        let plateau = ramp * ramp * (3.0 - 2.0 * ramp);
+        let ridge = (-((position.x - 11.0) / 4.0).powi(4)).exp();
+        broad + detail - 0.12 + 5.0 * plateau * ridge
     }
 
     pub fn normal_at(position: Vec2) -> Vec3 {
@@ -594,7 +604,7 @@ impl WorldAssets {
         let upload = |mesh: art::Mesh, label: &str| {
             mesh.upload(gpu, layout, samplers, label, Some((1, 1, &white)))
         };
-        let ground_mesh = art::terrain_patch(Vec2::splat(44.0), [48, 48], |xz| {
+        let ground_mesh = art::terrain_patch(Vec2::splat(44.0), [128, 128], |xz| {
             OrchardEnvironment::height_at(xz)
         });
         let ground_pixels = art::palette_texture(
@@ -623,25 +633,25 @@ impl WorldAssets {
             gpu,
             layout,
             samplers,
-            include_bytes!("../assets/character/frieren.glb"),
-            "pocket-openworld frieren.glb",
+            include_bytes!("../assets/character/frieren-chibi.glb"),
+            "pocket-openworld frieren-chibi.glb",
         )?;
         ensure!(
-            explorer.clips.len() == 5
-                && ["Idle", "Walk", "Chop", "Cast", "Water"]
+            explorer.clips.len() == 7
+                && ["Idle", "Walk", "Chop", "Cast", "Water", "Climb", "Fall"]
                     .iter()
                     .all(|name| explorer.clip_named(name).is_some()),
-            "frieren.glb must contain exactly the Idle, Walk, Chop, Cast, and Water clips"
+            "frieren-chibi.glb must contain the seven required locomotion and action clips"
         );
         ensure!(
             explorer.aabb.0.y.abs() <= 0.01,
-            "frieren.glb rest-pose AABB must meet the authored foot plane at Y=0; got min Y {}",
+            "frieren-chibi.glb rest-pose AABB must meet the authored foot plane at Y=0; got min Y {}",
             explorer.aabb.0.y
         );
         let clip = |name: &str| {
             let index = explorer
                 .clip_named(name)
-                .with_context(|| format!("frieren.glb is missing the {name} clip"))?;
+                .with_context(|| format!("frieren-chibi.glb is missing the {name} clip"))?;
             Ok::<_, anyhow::Error>((index, explorer.clips[index].duration.max(0.001)))
         };
         let (idle, _) = clip("Idle")?;
@@ -649,12 +659,17 @@ impl WorldAssets {
         let (chop, chop_duration) = clip("Chop")?;
         let (cast, cast_duration) = clip("Cast")?;
         let (water, water_duration) = clip("Water")?;
+        let (climb, climb_duration) = clip("Climb")?;
+        let (fall, _) = clip("Fall")?;
         let explorer_animations = ExplorerAnimations {
             idle,
             walk,
             chop,
             cast,
             water,
+            climb,
+            fall,
+            climb_duration,
             walk_duration,
             chop_duration,
             cast_duration,
@@ -662,13 +677,13 @@ impl WorldAssets {
         };
         let explorer_left_hand = explorer
             .node_named("hand.L")
-            .context("frieren.glb is missing the hand.L pickup socket")?;
+            .context("frieren-chibi.glb is missing the hand.L pickup socket")?;
         let explorer_staff_grip = explorer
             .node_named("staff.R")
-            .context("frieren.glb is missing the staff.R grip socket")?;
+            .context("frieren-chibi.glb is missing the staff.R grip socket")?;
         let explorer_staff_tip = explorer
             .node_named("staff.tip")
-            .context("frieren.glb is missing the authored staff.tip outlet socket")?;
+            .context("frieren-chibi.glb is missing the authored staff.tip outlet socket")?;
         Ok(Self {
             ground,
             trunk: upload(centered_cylinder(12), "world trunk"),
@@ -716,6 +731,7 @@ struct PendingActions {
     pickup: bool,
     douse: bool,
     reset: bool,
+    jump: bool,
 }
 
 #[derive(Default)]
@@ -876,9 +892,22 @@ pub struct WorldReceipt {
     pub cooked_entities: Vec<u64>,
     pub charred_entities: Vec<u64>,
     pub water: WaterReceipt,
+    pub locomotion: LocomotionReceipt,
     pub acceptance: AcceptanceReceipt,
     pub landmarks: Vec<TimedEvent>,
     pub entities: Vec<EntityReceipt>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct LocomotionReceipt {
+    pub grounded_turns: u64,
+    pub climbing_turns: u64,
+    pub airborne_turns: u64,
+    pub sliding_turns: u64,
+    pub max_height: f32,
+    pub min_stamina: f32,
+    pub surface_normal: [f32; 3],
+    pub current: Option<Locomotion>,
 }
 
 pub struct WorldGame {
@@ -904,6 +933,7 @@ pub struct WorldGame {
     message_turns: u16,
     receipts: RuntimeReceipts,
     last_target: Option<EntityId>,
+    locomotion_receipt: LocomotionReceipt,
     seed: u64,
 }
 
@@ -960,6 +990,10 @@ impl WorldGame {
             message_turns: 240,
             receipts: RuntimeReceipts::default(),
             last_target: None,
+            locomotion_receipt: LocomotionReceipt {
+                min_stamina: 1.0,
+                ..Default::default()
+            },
             seed,
         }
     }
@@ -1002,6 +1036,7 @@ impl WorldGame {
             cooked_entities: ids(&self.receipts.cooked),
             charred_entities: ids(&self.receipts.charred),
             water,
+            locomotion: self.locomotion_receipt.clone(),
             acceptance,
             landmarks: self.receipts.landmarks.clone(),
             entities,
@@ -1249,6 +1284,10 @@ impl WorldGame {
         self.water_burst_turns = 0;
         self.water_pose_turns = 0;
         self.last_target = None;
+        self.locomotion_receipt = LocomotionReceipt {
+            min_stamina: 1.0,
+            ..Default::default()
+        };
         self.message = "World reset from seed".into();
         self.message_turns = 150;
     }
@@ -1260,41 +1299,67 @@ impl WorldGame {
             .unwrap_or(Vec3::ZERO)
     }
 
-    fn move_player(&mut self, input: &Input, dt: f32) {
+    fn move_player(&mut self, input: &Input, _dt: f32) {
         let axis = Vec2::new(
             (input.key_down(KeyCode::KeyD) as i32 - input.key_down(KeyCode::KeyA) as i32) as f32,
             (input.key_down(KeyCode::KeyW) as i32 - input.key_down(KeyCode::KeyS) as i32) as f32,
         );
-        let movement = camera_relative_movement(axis, self.orbit_yaw);
-        let mut position = self.player_position();
-        let previous = position;
-        position += movement * MOVE_SPEED * dt;
-        position.x = position.x.clamp(-19.5, 19.5);
-        position.z = position.z.clamp(-19.5, 19.5);
-        for tree in &self.ids.trees {
-            let root = tree.root;
-            let delta = Vec2::new(position.x - root.x, position.z - root.z);
-            let minimum = 0.72 * tree.size;
-            if delta.length_squared() < minimum * minimum {
-                let push = delta.normalize_or(Vec2::X) * minimum;
-                position.x = root.x + push.x;
-                position.z = root.z + push.y;
-            }
-        }
-        let xz = Vec2::new(position.x, position.z);
-        position = player_capsule_center(xz, OrchardEnvironment::height_at(xz));
+        let direction = camera_relative_movement(axis, self.orbit_yaw);
+        let jump = std::mem::take(&mut self.pending.jump);
         if let Some(player) = self.world.entity_mut(self.ids.player) {
-            let velocity = (position - previous) / dt.max(0.0001);
-            player.transform.position = position;
-            if movement.length_squared() > 0.0 {
-                let yaw = (-movement.x).atan2(-movement.z);
-                player.transform.rotation = Quat::from_rotation_y(yaw);
-            }
-            if let Some(body) = player.body.as_mut() {
-                body.linear_velocity = velocity;
+            let motor = player.locomotion.as_mut().expect("player motor");
+            motor.input = LocomotionInput {
+                direction,
+                climb: axis,
+                grip: input.key_down(KeyCode::KeyC),
+                jump,
+            };
+            let facing = if motor.mode == LocomotionMode::Climbing {
+                -motor.normal * Vec3::new(1.0, 0.0, 1.0)
+            } else {
+                direction
+            };
+            if facing.length_squared() > 0.001 {
+                player.transform.rotation = Quat::from_rotation_y((-facing.x).atan2(-facing.z));
             }
         }
-        self.walk_phase += walk_phase_advance(previous, position);
+    }
+
+    fn observe_locomotion(&mut self, previous: Vec3) {
+        let player = self.world.entity(self.ids.player).expect("player");
+        let motor = player.locomotion.expect("motor");
+        let displacement = player.transform.position - previous;
+        self.walk_phase += if motor.mode == LocomotionMode::Climbing {
+            displacement.length() * 6.0
+        } else {
+            walk_phase_advance(previous, player.transform.position)
+        };
+        let receipt = &mut self.locomotion_receipt;
+        match motor.mode {
+            LocomotionMode::Grounded => receipt.grounded_turns += 1,
+            LocomotionMode::Climbing => receipt.climbing_turns += 1,
+            LocomotionMode::Airborne => receipt.airborne_turns += 1,
+            LocomotionMode::Sliding => receipt.sliding_turns += 1,
+        }
+        receipt.max_height = receipt
+            .max_height
+            .max(player.transform.position.y - PLAYER_HEIGHT);
+        receipt.min_stamina = receipt.min_stamina.min(motor.stamina);
+        receipt.surface_normal = motor.normal.to_array();
+        receipt.current = Some(motor);
+    }
+
+    pub fn prepare_locomotion_scenario(&mut self, scenario: &str) {
+        let xz = if scenario.contains("slope") {
+            Vec2::new(11.0, 5.0)
+        } else {
+            Vec2::new(0.0, 1.5)
+        };
+        let player = self.world.entity_mut(self.ids.player).expect("player");
+        player.transform.position = player_capsule_center(xz, OrchardEnvironment::height_at(xz));
+        // Headless input is camera-relative too; keep ascent direction -Z.
+        self.orbit_yaw = 0.0;
+        self.orbit_pitch = -0.12;
     }
 
     fn sync_held_apple_to_hand(&mut self) {
@@ -1594,6 +1659,7 @@ impl WorldGame {
         let Some(assets) = self.assets.clone() else {
             return;
         };
+        self.update_camera();
         self.scene.models.clear();
         self.scene.sprites.clear();
         self.scene.beams.clear();
@@ -1666,16 +1732,27 @@ impl WorldGame {
                     bark,
                 ));
             }
-            self.scene.models.push(art::instance(
-                &assets.canopy,
-                world
-                    * Mat4::from_scale_rotation_translation(
-                        Vec3::new(2.15, 1.62, 2.0) * tree.size,
-                        Quat::from_rotation_y((tree.seed as f32 * 0.17).sin()),
-                        Vec3::Y * 1.72 * tree.size,
-                    ),
-                leaf,
-            ));
+            let canopy_transform = world
+                * Mat4::from_scale_rotation_translation(
+                    Vec3::new(2.15, 1.62, 2.0) * tree.size,
+                    Quat::from_rotation_y((tree.seed as f32 * 0.17).sin()),
+                    Vec3::Y * 1.72 * tree.size,
+                );
+            let inverse = canopy_transform.inverse();
+            let subject = self.player_position() + Vec3::Y * 0.4;
+            let occludes = segment_intersects_bounds(
+                inverse.transform_point3(self.camera.pos),
+                inverse.transform_point3(subject),
+                assets.canopy.aabb.0,
+                assets.canopy.aabb.1,
+            );
+            let mut canopy_tint = leaf;
+            if occludes {
+                canopy_tint[3] = 0.12;
+            }
+            self.scene
+                .models
+                .push(art::instance(&assets.canopy, canopy_transform, canopy_tint));
             if fractured {
                 self.scene.models.push(art::instance(
                     &assets.stump,
@@ -1852,7 +1929,7 @@ impl WorldGame {
         let moving = player
             .body
             .is_some_and(|body| body.linear_velocity.length_squared() > 0.05);
-        Some(explorer_pose(
+        let mut pose = explorer_pose(
             player.transform,
             assets.explorer.aabb.0.y,
             assets.explorer_animations,
@@ -1860,11 +1937,35 @@ impl WorldGame {
             self.walk_phase,
             ExplorerActionState {
                 moving,
+                climbing: player
+                    .locomotion
+                    .is_some_and(|m| m.mode == LocomotionMode::Climbing),
+                falling: player.locomotion.is_some_and(|m| {
+                    matches!(m.mode, LocomotionMode::Airborne | LocomotionMode::Sliding)
+                }),
                 chop_turns: self.axe_swing_turns,
                 ember_cast_turns: self.ember_cast_turns,
                 water_burst_turns: water_turns,
             },
-        ))
+        );
+        if let Some(motor) = player
+            .locomotion
+            .filter(|m| m.mode == LocomotionMode::Climbing)
+        {
+            let normal = motor.normal;
+            let up = (Vec3::Y - normal * normal.y).normalize_or(Vec3::Y);
+            let right = up.cross(normal).normalize_or(Vec3::X);
+            let rotation = Quat::from_mat3(&Mat3::from_cols(-right, up, -normal));
+            let half_height =
+                player.collider.map_or(0.0, Collider::half_height) * player.transform.scale.y.abs();
+            let center = player.transform.position - normal * (half_height * normal.y);
+            pose.transform = Mat4::from_scale_rotation_translation(
+                player.transform.scale,
+                rotation,
+                center - up * PLAYER_HEIGHT,
+            );
+        }
+        Some(pose)
     }
 
     fn held_apple_socket_position(&self, assets: &WorldAssets, time: f32) -> Option<Vec3> {
@@ -2067,14 +2168,14 @@ impl WorldGame {
             63.0,
             1.0,
             [0.87, 0.94, 0.84, 1.0],
-            "WASD move  SPACE staff  F ember cast  Q water cast",
+            "WASD move  C grip/climb  SHIFT jump  SPACE staff",
         );
         self.hud.text(
             36.0,
             80.0,
             1.0,
             [0.75, 0.87, 0.78, 1.0],
-            "E pick/drop apple  mouse/arrow orbit  R reset",
+            "F fire  Q water  E apple  mouse orbit  R reset",
         );
         self.hud.text(
             36.0,
@@ -2088,6 +2189,30 @@ impl WorldGame {
             ),
         );
 
+        if let Some(motor) = self
+            .world
+            .entity(self.ids.player)
+            .and_then(|e| e.locomotion)
+        {
+            self.hud
+                .rect(20.0, 198.0, 224.0, 46.0, [0.035, 0.075, 0.07, 0.82]);
+            self.hud.text(
+                36.0,
+                207.0,
+                1.0,
+                [0.87, 0.94, 0.84, 1.0],
+                &format!("{:?}   stamina {:3.0}%", motor.mode, motor.stamina * 100.0),
+            );
+            self.hud
+                .rect(36.0, 227.0, 190.0, 5.0, [0.12, 0.19, 0.13, 1.0]);
+            self.hud.rect(
+                36.0,
+                227.0,
+                190.0 * motor.stamina,
+                5.0,
+                [0.47, 0.82, 0.29, 1.0],
+            );
+        }
         let water = water_hud_state(self.water_burst_turns);
         self.hud
             .rect(20.0, 132.0, 224.0, 55.0, [0.025, 0.075, 0.105, 0.82]);
@@ -2235,13 +2360,32 @@ impl Game for WorldGame {
         self.pending.pickup |= input.key_pressed(KeyCode::KeyE);
         self.pending.douse |= input.key_pressed(KeyCode::KeyQ);
         self.pending.reset |= input.key_pressed(KeyCode::KeyR);
+        self.pending.jump |= input.key_pressed(KeyCode::ShiftLeft);
     }
 
     fn tick(&mut self, dt: f32, input: &Input) {
         if std::mem::take(&mut self.pending.reset) {
             self.reset_world();
         }
+        let previous_player = self.player_position();
         self.move_player(input, dt);
+        let gripping = input.key_down(KeyCode::KeyC)
+            || self
+                .world
+                .entity(self.ids.player)
+                .and_then(|e| e.locomotion)
+                .is_some_and(|m| m.mode == LocomotionMode::Climbing);
+        if gripping {
+            if self.pending.chop || self.pending.ignite || self.pending.douse {
+                self.say("Release grip to use the staff", 90);
+            }
+            self.pending.chop = false;
+            self.pending.ignite = false;
+            self.pending.douse = false;
+            self.axe_swing_turns = 0;
+            self.ember_cast_turns = 0;
+            self.water_burst_turns = 0;
+        }
         if std::mem::take(&mut self.pending.chop) {
             self.chop_nearest();
         }
@@ -2278,6 +2422,7 @@ impl Game for WorldGame {
         }
         let report = self.world.step(&self.environment);
         self.observe_report(&report);
+        self.observe_locomotion(previous_player);
         self.axe_swing_turns = self.axe_swing_turns.saturating_sub(1);
         self.ember_cast_turns = self.ember_cast_turns.saturating_sub(1);
         self.water_burst_turns = self.water_burst_turns.saturating_sub(1);
@@ -2393,6 +2538,7 @@ fn build_world(seed: u64, environment: &OrchardEnvironment) -> (World, WorldIds,
     player_body.mode = BodyMode::Kinematic;
     player_body.mass = 72.0;
     player.body = Some(player_body);
+    player.locomotion = Some(Locomotion::default());
     player.collider = Some(Collider::CapsuleY {
         radius: 0.28,
         half_height: 0.55,
@@ -2779,6 +2925,65 @@ mod tests {
         game
     }
 
+    fn run_locomotion(scenario: &str, ticks: u64) -> WorldGame {
+        let mut game = WorldGame::new(7);
+        game.prepare_locomotion_scenario(scenario);
+        let mut input = Input::default();
+        for turn in 0..ticks {
+            crate::apply_scenario_script(&mut input, scenario, turn);
+            game.frame(1.0 / 60.0, &input);
+            game.tick(1.0 / 60.0, &input);
+            input.end_frame();
+        }
+        game
+    }
+
+    #[test]
+    fn tree_and_slope_climbing_use_live_input_and_replay_exactly() {
+        for scenario in ["tree-climb", "slope-climb"] {
+            let a = run_locomotion(scenario, 220);
+            let b = run_locomotion(scenario, 220);
+            assert_eq!(a.world.state_hash(), b.world.state_hash());
+            assert!(a.locomotion_receipt.climbing_turns > 80);
+            assert!(a.locomotion_receipt.max_height > 2.0);
+            assert!(a.locomotion_receipt.min_stamina < 0.9);
+            let player = a.world.entity(a.ids.player).unwrap();
+            assert!(
+                a.world
+                    .surface_contacts(player, &a.environment, 0.2)
+                    .iter()
+                    .all(|c| c.separation >= -0.003)
+            );
+        }
+    }
+
+    #[test]
+    fn sideways_climbing_follows_curved_surface_and_release_uses_gravity() {
+        let mut traverse = run_locomotion("tree-traverse", 210);
+        let player = traverse.world.entity(traverse.ids.player).unwrap();
+        assert!(player.transform.position.x > 0.6);
+        assert!(player.locomotion.unwrap().normal.x > 0.9);
+        let mut staff_input = Input::default();
+        staff_input.inject_key(KeyCode::KeyC, true);
+        staff_input.inject_key(KeyCode::KeyQ, true);
+        traverse.frame(1.0 / 60.0, &staff_input);
+        traverse.tick(1.0 / 60.0, &staff_input);
+        assert!(!traverse.water_burst_active());
+        assert!(traverse.message.contains("Release grip"));
+        let release = run_locomotion("climb-release", 190);
+        assert!(release.locomotion_receipt.airborne_turns > 20);
+        assert!(
+            release.player_position().y - PLAYER_HEIGHT
+                < release.locomotion_receipt.max_height - 0.5
+        );
+        let jump = run_locomotion("climb-jump", 165);
+        assert!(jump.locomotion_receipt.airborne_turns > 10);
+        assert!(jump.player_position().z > 1.1);
+        let slope = run_locomotion("slope-walk", 130);
+        assert_eq!(slope.locomotion_receipt.climbing_turns, 0);
+        assert!(slope.locomotion_receipt.sliding_turns > 20);
+    }
+
     #[test]
     fn orchard_recipe_is_replayable() {
         let a = scripted_run(7, 720);
@@ -2862,6 +3067,8 @@ mod tests {
     fn explorer_action_maps_every_live_input_with_explicit_priority() {
         let state = |moving, chop_turns, ember_cast_turns, water_burst_turns| ExplorerActionState {
             moving,
+            climbing: false,
+            falling: false,
             chop_turns,
             ember_cast_turns,
             water_burst_turns,
@@ -2882,6 +3089,9 @@ mod tests {
             chop: 7,
             cast: 11,
             water: 13,
+            climb: 17,
+            fall: 19,
+            climb_duration: 1.0,
             walk_duration: 0.8,
             chop_duration: 0.6,
             cast_duration: 0.4,

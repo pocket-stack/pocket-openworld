@@ -24,6 +24,13 @@ const SCENARIOS: &[&str] = &[
     "grass-fire",
     "grass-burnout",
     "campfire-douse",
+    "tree-climb",
+    "tree-traverse",
+    "climb-release",
+    "climb-jump",
+    "slope-climb",
+    "slope-walk",
+    "slope-crest",
 ];
 const CHARACTER_CARRY_CAPTURE_TICK: u64 = 360;
 const CHARACTER_CAST_CAPTURE_TICK: u64 = 24;
@@ -125,6 +132,12 @@ fn run_headless(args: Args) -> Result<()> {
     if matches!(args.scenario.as_str(), "grass-fire" | "grass-burnout") {
         game.prepare_grass_fire_scenario();
     }
+    if args.scenario.starts_with("tree-")
+        || args.scenario.starts_with("slope-")
+        || args.scenario.starts_with("climb-")
+    {
+        game.prepare_locomotion_scenario(&args.scenario);
+    }
     let mut input = Input::default();
     for turn in 0..args.ticks {
         apply_scenario_script(&mut input, &args.scenario, turn);
@@ -155,6 +168,23 @@ fn run_headless(args: Args) -> Result<()> {
         println!("pocket-openworld: wrote receipt {}", path.display());
     } else {
         println!("{receipt_json}");
+    }
+    if matches!(
+        args.scenario.as_str(),
+        "tree-climb" | "tree-traverse" | "slope-climb"
+    ) {
+        ensure!(
+            receipt.locomotion.climbing_turns > 30 && receipt.locomotion.max_height > 1.0,
+            "climb acceptance failed: {:?}",
+            receipt.locomotion
+        );
+    }
+    if args.scenario == "climb-release" {
+        ensure!(
+            receipt.locomotion.climbing_turns > 30 && receipt.locomotion.airborne_turns > 10,
+            "release acceptance failed: {:?}",
+            receipt.locomotion
+        );
     }
     if args.scenario == "orchard-fire" {
         ensure!(
@@ -201,8 +231,8 @@ fn run_headless(args: Args) -> Result<()> {
         );
     }
     println!(
-        "pocket-openworld: {} turns, state {}, systemic acceptance {}",
-        receipt.ticks, receipt.state_hash, receipt.acceptance.playable_chain_complete
+        "pocket-openworld: {} complete, {} turns, state {}",
+        receipt.scenario, receipt.ticks, receipt.state_hash
     );
     Ok(())
 }
@@ -245,7 +275,8 @@ fn parse_args() -> Result<Args> {
             }
             "-h" | "--help" => {
                 println!(
-                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-cast|character-carry|character-water|grass-fire|grass-burnout|campfire-douse\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
+                    "pocket-openworld\n\n  --headless\n  --scenario {}\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH",
+                    SCENARIOS.join("|")
                 );
                 std::process::exit(0);
             }
@@ -266,6 +297,16 @@ fn parse_args() -> Result<Args> {
 fn apply_scenario_script(input: &mut Input, scenario: &str, turn: u64) {
     match scenario {
         "orchard-fire" => apply_orchard_script(input, turn),
+        "tree-climb" | "tree-traverse" | "climb-release" | "climb-jump" | "slope-climb"
+        | "slope-walk" | "slope-crest" => {
+            input.inject_key(KeyCode::ShiftLeft, scenario == "climb-jump" && turn == 150);
+            input.inject_key(KeyCode::KeyW, scenario != "tree-traverse" || turn < 150);
+            input.inject_key(KeyCode::KeyD, scenario == "tree-traverse" && turn >= 150);
+            input.inject_key(
+                KeyCode::KeyC,
+                scenario != "slope-walk" && (scenario != "climb-release" || turn < 150),
+            );
+        }
         "character-walk" => input.inject_key(KeyCode::KeyW, true),
         "character-chop" => {
             input.inject_key(KeyCode::KeyW, turn < 101);
@@ -284,13 +325,10 @@ fn apply_scenario_script(input: &mut Input, scenario: &str, turn: u64) {
         "character-carry" => {
             apply_carry_script(input, turn);
             input.inject_key(KeyCode::KeyS, (302..332).contains(&turn));
-            input.inject_key(KeyCode::ArrowLeft, (334..356).contains(&turn));
+            input.inject_key(KeyCode::ArrowRight, (302..356).contains(&turn));
             // The real-scale fruit settles closer to the trunk than the old
             // oversized proxy, so take a short approach before pickup.
-            input.inject_key(
-                KeyCode::KeyD,
-                (284..292).contains(&turn) || (357..359).contains(&turn),
-            );
+            input.inject_key(KeyCode::KeyD, (284..292).contains(&turn));
         }
         "character-water" => {
             input.inject_key(KeyCode::ArrowLeft, turn < 35);
@@ -366,8 +404,8 @@ mod tests {
 
     #[test]
     fn frieren_glb_contains_the_runtime_rig_contract() {
-        let bytes = include_bytes!("../assets/character/frieren.glb");
-        let gltf = gltf::Gltf::from_slice(bytes).expect("frieren.glb must parse");
+        let bytes = include_bytes!("../assets/character/frieren-chibi.glb");
+        let gltf = gltf::Gltf::from_slice(bytes).expect("frieren-chibi.glb must parse");
         assert!(
             gltf.blob.is_some(),
             "the runtime GLB must be self-contained"
@@ -383,7 +421,7 @@ mod tests {
             .collect();
         assert_eq!(
             animation_names,
-            BTreeSet::from(["Cast", "Chop", "Idle", "Walk", "Water"])
+            BTreeSet::from(["Cast", "Chop", "Idle", "Walk", "Water", "Climb", "Fall"])
         );
         let clip_targets = |name: &str| -> BTreeSet<String> {
             gltf.animations()
@@ -467,7 +505,7 @@ mod tests {
             }
         }
         assert!(
-            (2_000..=8_000).contains(&triangles),
+            (2_000..=12_000).contains(&triangles),
             "Frieren mesh budget changed: {triangles} triangles"
         );
         assert_eq!(
@@ -478,12 +516,12 @@ mod tests {
             primitive_count <= 16,
             "Frieren draw-call budget changed: {primitive_count} primitives"
         );
+        assert!(gltf.materials().count() <= 12);
         assert_eq!(
-            gltf.materials().count(),
-            1,
-            "Frieren material contract changed"
+            gltf.images().count(),
+            0,
+            "clean-room character uses authored materials"
         );
-        assert_eq!(gltf.images().count(), 1, "Frieren texture was not embedded");
 
         let (document, buffers, _) = gltf::import_slice(bytes).expect("GLB payload must import");
         assert!((1..=4).contains(&document.skins().count()));

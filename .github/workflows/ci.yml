@@ -44,26 +44,11 @@ jobs:
       - name: Create acceptance directory
         run: mkdir -p artifacts
 
-      - name: Verify orchard interactions
-        run: >-
-          cargo run --locked --package pocket-openworld --
-          --headless --scenario orchard-fire --ticks 720 --seed 7 --size 960x600
-          --receipt artifacts/orchard-fire.json
-          --screenshot artifacts/orchard-fire.png
+      - name: Build application
+        run: cargo build --locked --package pocket-openworld
 
-      - name: Verify water rendering
-        run: >-
-          cargo run --locked --package pocket-openworld --
-          --headless --scenario character-water --ticks 47 --size 960x600
-          --receipt artifacts/character-water.json
-          --screenshot artifacts/character-water.png
-
-      - name: Verify sustained extinguishing
-        run: >-
-          cargo run --locked --package pocket-openworld --
-          --headless --scenario campfire-douse --ticks 390 --size 960x600
-          --receipt artifacts/campfire-douse.json
-          --screenshot artifacts/campfire-douse.png
+      - name: Verify interactions, traversal, rendering and replay
+        run: python3 tools/verify_traversal.py --output artifacts
 
       - name: Upload acceptance evidence
         if: always()
