@@ -18,6 +18,10 @@ transitions.
 
 Clone the PocketJS engine dependency with the repository:
 
+Source builds require Rust from `rust-toolchain.toml` and Bun from `.bun-version`.
+Cargo installs the pinned JavaScript dependencies and generates the UI before
+compiling the game; no manual UI build step or checked-in bundle is required.
+
 ```sh
 git clone --recurse-submodules git@github.com:pocket-stack/pocket-openworld.git
 cd pocket-openworld
@@ -30,18 +34,59 @@ by the application; engine changes remain owned by the PocketJS repository.**
 
 Controls:
 
-- `WASD` moves Frieren.
-- Mouse movement or arrow keys orbit the camera.
-- `Space` performs a staff strike at the nearest tree or log.
-- `F` plays the staff-casting animation and casts an ember at the aimed
-  reactive object, including grass.
-- `Q` raises the staff and fires a short forward water burst from its animated
-  ornate tip. The stream
-  always appears, even over empty ground, and douses every reactive object
-  inside its widening corridor.
-- `E` picks up or drops the nearest apple.
-- `R` resets the world to the initial seed.
-- `Escape` releases or captures the mouse; close the window to quit.
+- **Tab** opens the XP-style PocketJS control window and releases the cursor.
+  Click experiment tabs, actions or automatic comparisons. Drag the title bar
+  to move the window. Close it with X, Back to game or Tab to resume gameplay.
+- **WASD** moves Frieren while the window is closed; the mouse orbits the camera.
+- The Orchard tab offers staff swing, ignition, water and pickup actions.
+
+## Clickable chemistry trials
+
+```sh
+cargo run --locked -- --shelter
+```
+
+This opens the control window over the laboratory. Choose **Rain**, **Screen**
+or **Firebreak**, then click the main comparison button. Each sequence submits
+normal actions to the simulation, shows progress, verifies the resulting state
+and pauses for inspection. The second button runs an alternate comparison;
+Firebreak's dry control proves that both rows burn through without water.
+
+Manual buttons expose rain, ignition, spray and movable shielding. They stop the
+current automatic sequence and continue simulation. Reset starts the selected
+trial again; Pause/Resume controls observation time. Returning to the game also
+resumes simulation. The original Frieren asset and five clips remain in use.
+
+[中文点击验收步骤](docs/shelter-acceptance.md) covers the comparisons and controls.
+The window shows live moisture, temperature and whether fire reached the far
+end. The world remains visible beside it. Input ownership, ordered pointer
+edges, DPI mapping and the XP chrome theme come from PocketJS; this application
+owns the panel content, recipes and comparison sequences.
+
+All gameplay HUD text uses Inter Regular/Bold through the same PocketJS text
+renderer as the XP window. This includes orchard status, target readings, water
+progress, experiment observations, projected labels and notifications. The HUD
+scales with the display and does not take the pointer from gameplay.
+
+```sh
+cargo build --locked
+python3 tools/verify_shelter.py --output target/acceptance/controls
+```
+
+This reads UI build provenance from the executable, checks its input hashes,
+and verifies all 26 scenarios: eight window/input cases,
+eight shelter comparisons and ten orchard regressions. Each has an identical
+complete receipt replay and a PNG. `cargo build`, `cargo test` and `cargo run`
+generate JS, font/style PAK and their manifest under Cargo's `OUT_DIR`.
+UI, shared framework and font changes trigger regeneration. The built game
+embeds those files and runs without Bun or loose UI assets.
+
+Generated UI and per-run receipts, PNGs and logs are ignored by Git. CI uploads
+the full acceptance set as `pocket-openworld-acceptance` artifacts with 30-day
+retention; use the workflow run for the PR's current commit. The repository
+keeps the scripts, assertions and [manual checklist](docs/shelter-acceptance.md).
+[Build verification](docs/build.md) covers fresh generation, incremental changes,
+missing outputs, failed compilation and stale-binary detection.
 
 ## Deterministic acceptance
 

@@ -25,6 +25,17 @@ use winit::keyboard::KeyCode;
 
 use crate::art;
 
+#[path = "controls.rs"]
+mod controls;
+pub use controls::{ControlReceipt, control_scenario_ticks, shelter_script_actions};
+
+#[path = "hud.rs"]
+mod hud;
+
+#[path = "shelter.rs"]
+mod shelter;
+pub use shelter::ShelterTrial;
+
 const PLAYER_HEIGHT: f32 = 0.84;
 const MOVE_SPEED: f32 = 3.55;
 const WALK_PHASE_RADIANS_PER_METER: f32 = 2.75;
@@ -245,18 +256,9 @@ struct WaterJetSample {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct WaterContact {
-    distance: f32,
-    coverage: f32,
-    retention: f32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
 struct WaterDose {
     target: EntityId,
     amount: f32,
-    distance: f32,
-    coverage: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -353,80 +355,30 @@ fn water_jet_samples(jet: WaterJet) -> [WaterJetSample; WATER_POINT_COUNT] {
     })
 }
 
-/// Return the strongest overlap between the sampled curved jet and a target's
-/// oriented capsule. Spheres are represented by a zero-length segment.
-fn water_jet_contact(
-    jet: WaterJet,
-    transform: Transform,
-    collider: Option<Collider>,
-) -> Option<WaterContact> {
-    let collider = collider.unwrap_or(Collider::Sphere { radius: 0.20 });
-    let axis = transform.rotation * Vec3::Y;
-    let half_height = collider.half_height() * transform.scale.y.abs();
-    let target_radius = collider.radius() * transform.scale.abs().max_element().max(f32::EPSILON);
-    let target_a = transform.position - axis * half_height;
-    let target_b = transform.position + axis * half_height;
-
-    // The tube has a rounded outlet, but it cannot reach an object whose whole
-    // capsule lies behind the actor-facing nozzle plane.
-    let target_forward = (target_a - jet.origin)
-        .dot(jet.direction)
-        .max((target_b - jet.origin).dot(jet.direction));
-    if target_forward <= 0.0 {
-        return None;
-    }
-
+/// Author the staff's spray shape. Intersections, interception and delivered
+/// amounts are resolved by the engine when these finite packets are consumed.
+fn water_jet_emissions(jet: WaterJet, source: EntityId) -> Vec<pocket3d_world::WaterEmission> {
     let samples = water_jet_samples(jet);
-    samples
-        .windows(2)
-        .filter_map(|segment| {
-            let (fraction, distance_squared) = segment_distance_from_first(
-                segment[0].center,
-                segment[1].center,
-                target_a,
-                target_b,
-            );
-            let spray_radius =
-                segment[0].radius + (segment[1].radius - segment[0].radius) * fraction;
-            let reach = spray_radius + target_radius;
-            if distance_squared > reach * reach {
-                return None;
-            }
-            let radial_fraction = distance_squared.sqrt() / reach.max(f32::EPSILON);
-            let coverage = (1.0 - radial_fraction * radial_fraction).clamp(0.0, 1.0);
-            let distance =
-                segment[0].distance + (segment[1].distance - segment[0].distance) * fraction;
-            let retention =
-                segment[0].retention + (segment[1].retention - segment[0].retention) * fraction;
-            Some(WaterContact {
-                distance,
-                coverage,
-                retention,
-            })
-        })
-        .max_by(|a, b| (a.coverage * a.retention).total_cmp(&(b.coverage * b.retention)))
-}
-
-fn allocate_water_doses(
-    contacts: impl IntoIterator<Item = (EntityId, WaterContact)>,
-    budget: f32,
-) -> Vec<WaterDose> {
-    let contacts: Vec<_> = contacts
+    let right = jet.direction.cross(Vec3::Y).normalize_or(Vec3::X);
+    let up = right.cross(jet.direction).normalize_or(Vec3::Y);
+    let mut offsets = vec![Vec2::ZERO];
+    for ring in 1..=3 {
+        for index in 0..ring * 8 {
+            let angle = index as f32 / (ring * 8) as f32 * TAU;
+            offsets.push(Vec2::new(angle.cos(), angle.sin()) * (ring as f32 / 3.0));
+        }
+    }
+    let amount = WATER_DOUSE_BUDGET_PER_TURN / offsets.len() as f32;
+    offsets
         .into_iter()
-        .filter_map(|(target, contact)| {
-            let weight = contact.coverage * contact.retention;
-            (weight.is_finite() && weight > 0.0).then_some((target, contact, weight))
-        })
-        .collect();
-    let total_weight: f32 = contacts.iter().map(|(_, _, weight)| weight).sum();
-    let scale = budget.max(0.0) / total_weight.max(1.0);
-    contacts
-        .into_iter()
-        .map(|(target, contact, weight)| WaterDose {
-            target,
-            amount: weight * scale,
-            distance: contact.distance,
-            coverage: contact.coverage,
+        .map(|offset| pocket3d_world::WaterEmission {
+            points: samples
+                .iter()
+                .map(|sample| sample.center + (right * offset.x + up * offset.y) * sample.radius)
+                .collect(),
+            amount,
+            temperature_c: 18.0,
+            source: Some(source),
         })
         .collect()
 }
@@ -447,48 +399,6 @@ fn water_curtain_point(
 
 /// Return the normalized position on the first segment and the squared
 /// distance between the two closest points.
-fn segment_distance_from_first(a0: Vec3, a1: Vec3, b0: Vec3, b1: Vec3) -> (f32, f32) {
-    const EPSILON: f32 = 1e-8;
-    let d1 = a1 - a0;
-    let d2 = b1 - b0;
-    let r = a0 - b0;
-    let a = d1.length_squared();
-    let e = d2.length_squared();
-    let f = d2.dot(r);
-
-    let (mut s, t) = if a <= EPSILON && e <= EPSILON {
-        (0.0, 0.0)
-    } else if a <= EPSILON {
-        (0.0, (f / e).clamp(0.0, 1.0))
-    } else {
-        let c = d1.dot(r);
-        if e <= EPSILON {
-            ((-c / a).clamp(0.0, 1.0), 0.0)
-        } else {
-            let b = d1.dot(d2);
-            let denominator = a * e - b * b;
-            let mut s = if denominator.abs() > EPSILON {
-                ((b * f - c * e) / denominator).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            let mut t = (b * s + f) / e;
-            if t < 0.0 {
-                t = 0.0;
-                s = (-c / a).clamp(0.0, 1.0);
-            } else if t > 1.0 {
-                t = 1.0;
-                s = ((b - c) / a).clamp(0.0, 1.0);
-            }
-            (s, t)
-        }
-    };
-    s = s.clamp(0.0, 1.0);
-    let point_a = a0 + d1 * s;
-    let point_b = b0 + d2 * t;
-    (s, point_a.distance_squared(point_b))
-}
-
 fn water_hud_state(remaining_turns: u16) -> WaterHudState {
     WaterHudState {
         spraying: remaining_turns > 0,
@@ -505,6 +415,7 @@ pub struct OrchardEnvironment {
     pub temperature_c: f32,
     pub humidity: f32,
     pub wind: Vec3,
+    pub rain: Option<pocket3d_world::Rainfall>,
 }
 
 impl Default for OrchardEnvironment {
@@ -513,6 +424,7 @@ impl Default for OrchardEnvironment {
             temperature_c: 24.0,
             humidity: 0.025,
             wind: Vec3::new(-0.7, 0.0, 0.28),
+            rain: None,
         }
     }
 }
@@ -535,6 +447,9 @@ impl OrchardEnvironment {
 }
 
 impl Environment for OrchardEnvironment {
+    fn rainfall(&self) -> Option<pocket3d_world::Rainfall> {
+        self.rain
+    }
     fn sample(&self, position: Vec3) -> EnvironmentSample {
         let xz = Vec2::new(position.x, position.z);
         EnvironmentSample {
@@ -568,6 +483,7 @@ struct WorldIds {
 
 #[derive(Clone)]
 struct WorldAssets {
+    panel: Arc<ModelAsset>,
     ground: Arc<ModelAsset>,
     trunk: Arc<ModelAsset>,
     branch: Arc<ModelAsset>,
@@ -670,6 +586,7 @@ impl WorldAssets {
             .node_named("staff.tip")
             .context("frieren.glb is missing the authored staff.tip outlet socket")?;
         Ok(Self {
+            panel: upload(shelter::panel_mesh(), "transport panel"),
             ground,
             trunk: upload(centered_cylinder(12), "world trunk"),
             branch: upload(centered_cylinder(9), "world branch"),
@@ -711,6 +628,10 @@ struct Decoration {
 
 #[derive(Default)]
 struct PendingActions {
+    orchard: bool,
+    trial: Option<ShelterTrial>,
+    rain: bool,
+    view: bool,
     chop: bool,
     ignite: bool,
     pickup: bool,
@@ -863,6 +784,8 @@ pub struct WaterReceipt {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct WorldReceipt {
+    pub shelter: Option<shelter::ShelterReceipt>,
+    pub controls: ControlReceipt,
     pub schema: &'static str,
     pub scenario: String,
     pub seed: u64,
@@ -882,6 +805,8 @@ pub struct WorldReceipt {
 }
 
 pub struct WorldGame {
+    shelter: Option<shelter::ShelterLab>,
+    controls: controls::Controls,
     pub world: World,
     environment: OrchardEnvironment,
     ids: WorldIds,
@@ -938,6 +863,8 @@ impl WorldGame {
         camera.pos = Vec3::new(8.0, 5.5, 12.0);
         camera.look_at(Vec3::new(0.0, 2.0, 4.0));
         Self {
+            shelter: None,
+            controls: controls::Controls::default(),
             world,
             environment,
             ids,
@@ -989,6 +916,8 @@ impl WorldGame {
             })
             .collect();
         WorldReceipt {
+            shelter: self.shelter_receipt(),
+            controls: self.control_receipt(),
             schema: "pocket3d.playable-world.receipt.v1",
             scenario: scenario.into(),
             seed: self.seed,
@@ -1261,6 +1190,9 @@ impl WorldGame {
     }
 
     fn move_player(&mut self, input: &Input, dt: f32) {
+        if self.controls.open || self.controls.block_gameplay_frame {
+            return;
+        }
         let axis = Vec2::new(
             (input.key_down(KeyCode::KeyD) as i32 - input.key_down(KeyCode::KeyA) as i32) as f32,
             (input.key_down(KeyCode::KeyW) as i32 - input.key_down(KeyCode::KeyS) as i32) as f32,
@@ -1431,38 +1363,13 @@ impl WorldGame {
         Some(staff_water_jet(pose.transform, grip, tip))
     }
 
-    fn water_contacts(&self, jet: WaterJet) -> Vec<(EntityId, WaterContact)> {
-        self.world
-            .entities()
-            .filter_map(|(&id, entity)| {
-                (!entity.has_tag("player")
-                    && entity.reactive_material.is_some()
-                    && entity.reactive_state.is_some())
-                .then(|| water_jet_contact(jet, entity.transform, entity.collider))
-                .flatten()
-                .map(|contact| (id, contact))
-            })
-            .collect()
-    }
-
-    fn queue_water_douse(&mut self) -> Vec<WaterDose> {
+    fn queue_water_douse(&mut self) {
         let Some(jet) = self.current_water_jet() else {
-            return Vec::new();
+            return;
         };
-        let doses = allocate_water_doses(self.water_contacts(jet), WATER_DOUSE_BUDGET_PER_TURN);
-        for dose in &doses {
-            self.world.queue_interaction(Interaction::Douse {
-                target: dose.target,
-                amount: dose.amount,
-            });
+        for emission in water_jet_emissions(jet, self.ids.player) {
+            self.world.queue_interaction(Interaction::Water(emission));
         }
-        self.receipts.observe_water(
-            self.world.tick().saturating_add(1),
-            WATER_DOUSE_BUDGET_PER_TURN,
-            &doses,
-        );
-        self.last_target = doses.first().map(|dose| dose.target).or(self.last_target);
-        doses
     }
 
     fn nearest_reactive(
@@ -1591,6 +1498,10 @@ impl WorldGame {
     }
 
     fn rebuild_scene(&mut self, time: f32, size: (u32, u32)) {
+        if self.shelter.is_some() {
+            self.rebuild_shelter_scene(time, size);
+            return;
+        }
         let Some(assets) = self.assets.clone() else {
             return;
         };
@@ -2056,152 +1967,12 @@ impl WorldGame {
 
     fn update_hud(&mut self, size: (u32, u32)) {
         self.hud.clear();
-        let width = size.0 as f32;
-        let height = size.1 as f32;
-        self.hud
-            .rect(20.0, 20.0, 425.0, 102.0, [0.035, 0.075, 0.07, 0.78]);
-        self.hud
-            .text(36.0, 34.0, 2.0, [0.92, 0.84, 0.58, 1.0], "REACTIVE ORCHARD");
-        self.hud.text(
-            36.0,
-            63.0,
-            1.0,
-            [0.87, 0.94, 0.84, 1.0],
-            "WASD move  SPACE staff  F ember cast  Q water cast",
-        );
-        self.hud.text(
-            36.0,
-            80.0,
-            1.0,
-            [0.75, 0.87, 0.78, 1.0],
-            "E pick/drop apple  mouse/arrow orbit  R reset",
-        );
-        self.hud.text(
-            36.0,
-            98.0,
-            1.0,
-            [0.62, 0.78, 0.69, 1.0],
-            &format!(
-                "turn {:05}  state {:016x}",
-                self.world.tick(),
-                self.world.state_hash()
-            ),
-        );
-
-        let water = water_hud_state(self.water_burst_turns);
-        self.hud
-            .rect(20.0, 132.0, 224.0, 55.0, [0.025, 0.075, 0.105, 0.82]);
-        self.hud.text(
-            36.0,
-            141.0,
-            1.25,
-            if water.spraying {
-                [0.45, 0.90, 1.0, 1.0]
-            } else {
-                [0.64, 0.82, 0.86, 1.0]
-            },
-            if water.spraying {
-                "WATER SPRAYING"
-            } else {
-                "WATER READY"
-            },
-        );
-        self.hud
-            .rect(36.0, 169.0, 192.0, 7.0, [0.025, 0.12, 0.16, 0.92]);
-        self.hud.rect(
-            36.0,
-            169.0,
-            192.0 * water.progress,
-            7.0,
-            if water.spraying {
-                [0.12, 0.68, 0.98, 0.95]
-            } else {
-                [0.20, 0.48, 0.62, 0.78]
-            },
-        );
-
-        let target_id = self
-            .last_target
-            .or_else(|| self.nearest_reactive(self.player_position(), 6.0, false));
-        let target = target_id.and_then(|id| {
-            let entity = self.world.entity(id)?;
-            Some((id, entity.name.clone(), entity.reactive_state?))
-        });
-        if let Some((id, name, state)) = target {
-            let panel_width = 300.0;
-            self.hud.rect(
-                width - panel_width - 20.0,
-                20.0,
-                panel_width,
-                104.0,
-                [0.035, 0.075, 0.07, 0.76],
-            );
-            let name = name.as_deref().unwrap_or("material");
-            self.hud.text(
-                width - panel_width - 4.0,
-                34.0,
-                1.5,
-                [0.95, 0.82, 0.49, 1.0],
-                &format!("{} #{}", name, id.0),
-            );
-            self.hud.text(
-                width - panel_width - 4.0,
-                59.0,
-                1.0,
-                [0.86, 0.92, 0.82, 1.0],
-                &format!(
-                    "TEMP {:>5.1} C   MOIST {:>3.0}%",
-                    state.temperature_c,
-                    state.moisture * 100.0
-                ),
-            );
-            self.hud.text(
-                width - panel_width - 4.0,
-                76.0,
-                1.0,
-                [0.86, 0.92, 0.82, 1.0],
-                &format!(
-                    "FUEL {:>3.0}%   BURN {}",
-                    state.fuel * 100.0,
-                    if state.burning { "YES" } else { "NO" }
-                ),
-            );
-            self.hud.text(
-                width - panel_width - 4.0,
-                93.0,
-                1.0,
-                [0.72, 0.84, 0.73, 1.0],
-                &format!(
-                    "COOK {:>3.0}%   CHAR {:>3.0}%",
-                    state.cook_progress * 100.0,
-                    state.char_progress * 100.0
-                ),
-            );
-        }
-        if self.message_turns > 0 {
-            let panel_width = (self.message.len() as f32 * 8.0 + 38.0).min(width - 40.0);
-            let x = (width - panel_width) * 0.5;
-            self.hud.rect(
-                x,
-                height - 74.0,
-                panel_width,
-                38.0,
-                [0.035, 0.065, 0.055, 0.84],
-            );
-            self.hud.text_centered(
-                width * 0.5,
-                height - 61.0,
-                1.0,
-                [0.94, 0.88, 0.66, 1.0],
-                &self.message,
-            );
-        }
         self.hud.crosshair(
-            width * 0.5,
-            height * 0.5,
-            5.0,
-            6.0,
-            1.5,
+            size.0 as f32 * 0.5,
+            size.1 as f32 * 0.5,
+            5.0 * self.controls.scale,
+            6.0 * self.controls.scale,
+            1.5 * self.controls.scale,
             [0.94, 0.89, 0.67, 0.7],
         );
     }
@@ -2214,6 +1985,9 @@ impl Game for WorldGame {
     }
 
     fn frame(&mut self, dt: f32, input: &Input) {
+        if self.controls_frame(input) {
+            return;
+        }
         let mouse = input.mouse_delta();
         self.orbit_yaw = (self.orbit_yaw - mouse.x * 0.0028).rem_euclid(TAU);
         self.orbit_pitch = (self.orbit_pitch - mouse.y * 0.0024).clamp(-0.72, 0.34);
@@ -2230,6 +2004,23 @@ impl Game for WorldGame {
         if input.key_down(KeyCode::ArrowDown) {
             self.orbit_pitch = (self.orbit_pitch - orbit_speed).max(-0.72);
         }
+        if input.key_pressed(KeyCode::KeyL) {
+            self.pending.trial = Some(ShelterTrial::Rain);
+        }
+        if self.shelter.is_some() {
+            self.pending.orchard |= input.key_pressed(KeyCode::Digit0);
+            for (key, trial) in [
+                (KeyCode::Digit1, ShelterTrial::Rain),
+                (KeyCode::Digit2, ShelterTrial::Screen),
+                (KeyCode::Digit3, ShelterTrial::Firebreak),
+            ] {
+                if input.key_pressed(key) {
+                    self.pending.trial = Some(trial);
+                }
+            }
+            self.pending.rain |= input.key_pressed(KeyCode::KeyT);
+            self.pending.view |= input.key_pressed(KeyCode::KeyV);
+        }
         self.pending.chop |= input.key_pressed(KeyCode::Space);
         self.pending.ignite |= input.key_pressed(KeyCode::KeyF);
         self.pending.pickup |= input.key_pressed(KeyCode::KeyE);
@@ -2238,6 +2029,25 @@ impl Game for WorldGame {
     }
 
     fn tick(&mut self, dt: f32, input: &Input) {
+        if std::mem::take(&mut self.pending.orchard) {
+            let assets = self.assets.take();
+            let controls = std::mem::take(&mut self.controls);
+            *self = Self::new(self.seed);
+            self.assets = assets;
+            self.controls = controls;
+        }
+        if let Some(trial) = self.pending.trial.take() {
+            self.install_shelter(trial);
+        }
+        if self.controls.paused {
+            return;
+        }
+        self.queue_comparison_actions();
+        if self.shelter.is_some() {
+            self.tick_shelter(dt, input);
+            self.observe_comparison();
+            return;
+        }
         if std::mem::take(&mut self.pending.reset) {
             self.reset_world();
         }
@@ -2257,26 +2067,41 @@ impl Game for WorldGame {
             self.begin_water_burst();
         }
         self.water_pose_turns = self.water_burst_turns;
-        let water_targets = if self.water_pose_turns > 0 {
-            self.queue_water_douse()
-        } else {
-            Vec::new()
-        };
+        if self.water_pose_turns > 0 {
+            self.queue_water_douse();
+        }
+        let report = self.world.step(&self.environment);
+        let water_targets: Vec<_> = report
+            .transport
+            .water
+            .iter()
+            .filter(|transfer| transfer.source == pocket3d_world::WaterSource::Emission)
+            .map(|transfer| WaterDose {
+                target: transfer.target,
+                amount: transfer.delivered,
+            })
+            .collect();
+        if self.water_pose_turns > 0 {
+            self.receipts
+                .observe_water(report.tick, WATER_DOUSE_BUDGET_PER_TURN, &water_targets);
+            self.last_target = water_targets
+                .first()
+                .map(|dose| dose.target)
+                .or(self.last_target);
+        }
         if water_started {
             if water_targets.is_empty() {
                 self.say("Water burst sprayed across the open ground", 90);
             } else {
                 self.say(
                     format!(
-                        "Water burst soaked {} reactive material{}",
-                        water_targets.len(),
-                        if water_targets.len() == 1 { "" } else { "s" }
+                        "Water burst reached {} material volumes",
+                        water_targets.len()
                     ),
                     110,
                 );
             }
         }
-        let report = self.world.step(&self.environment);
         self.observe_report(&report);
         self.axe_swing_turns = self.axe_swing_turns.saturating_sub(1);
         self.ember_cast_turns = self.ember_cast_turns.saturating_sub(1);
@@ -2284,9 +2109,45 @@ impl Game for WorldGame {
         self.message_turns = self.message_turns.saturating_sub(1);
     }
 
+    fn cursor_mode(&self) -> pocket3d::app::CursorMode {
+        self.controls_cursor_mode()
+    }
+
+    fn resized(&mut self, size: (u32, u32), scale: f64) {
+        self.controls.size = size;
+        self.controls.scale = (scale as f32)
+            .min(size.1 as f32 / 600.0)
+            .min(size.0 as f32 / 760.0)
+            .max(0.25);
+        if let Some(ui) = self.controls.overlay.as_mut()
+            && let Err(error) = ui.resize(size, self.controls.scale)
+        {
+            eprintln!("{error}");
+        }
+    }
+
+    fn overlay(
+        &mut self,
+        gpu: &Gpu,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        format: wgpu::TextureFormat,
+        _size: (u32, u32),
+    ) {
+        if let Some(ui) = self.controls.overlay.as_mut()
+            && let Err(error) = ui.render(gpu, encoder, view, format)
+        {
+            eprintln!("{error}");
+        }
+    }
+
     fn compose(&mut self, _alpha: f32, time: f32, size: (u32, u32)) -> (&Scene, &Camera, &Hud) {
         self.presentation_time = time;
         self.rebuild_scene(time, size);
+        if self.controls.open {
+            self.hud.clear();
+        }
+        self.refresh_presentation_ui();
         (&self.scene, &self.camera, &self.hud)
     }
 }
@@ -3215,21 +3076,6 @@ mod tests {
     }
 
     #[test]
-    fn curved_water_tube_hits_near_and_far_but_not_side_or_back_targets() {
-        let jet = water_jet(Vec3::Y * 0.9, Vec3::NEG_Z);
-        let samples = water_jet_samples(jet);
-        let sphere = Some(Collider::Sphere { radius: 0.18 });
-        let near = Transform::from_translation(samples[5].center);
-        let far = Transform::from_translation(samples[10].center);
-        let side = Transform::from_translation(samples[8].center + Vec3::X * 1.1);
-        let back = Transform::from_translation(jet.origin - jet.direction * 0.15);
-        assert!(water_jet_contact(jet, near, sphere).is_some());
-        assert!(water_jet_contact(jet, far, sphere).is_some());
-        assert!(water_jet_contact(jet, side, sphere).is_none());
-        assert!(water_jet_contact(jet, back, sphere).is_none());
-    }
-
-    #[test]
     fn q_starts_a_visible_burst_even_over_empty_ground() {
         let mut game = WorldGame::new(7);
         let player_xz = Vec2::new(-30.0, 30.0);
@@ -3251,66 +3097,54 @@ mod tests {
     }
 
     #[test]
-    fn water_budget_is_conserved_and_near_centered_targets_receive_more() {
+    fn authored_spray_budget_and_occlusion_are_resolved_by_the_engine() {
         let mut game = WorldGame::new(7);
         let jet = game.current_water_jet().unwrap();
         let samples = water_jet_samples(jet);
-        let mut spawn_target = |position: Vec3| {
-            let mut target = EntityBundle::new(Transform::from_translation(position))
-                .named("water test target")
-                .tagged("water-test");
-            target.body = Some(Body::static_body());
-            target.collider = Some(Collider::Sphere { radius: 0.18 });
-            target.reactive_material = Some(wood_material());
-            target.reactive_state = Some(ReactiveState::new(24.0, 0.0, 1.0));
-            game.world.spawn(target)
+        let mut spawn = |position: Vec3| {
+            let mut bundle = EntityBundle::new(Transform::from_translation(position));
+            bundle.collider = Some(Collider::Sphere { radius: 0.6 });
+            bundle.reactive_material = Some(wood_material());
+            bundle.reactive_state = Some(ReactiveState::new(24.0, 0.0, 1.0));
+            game.world.spawn(bundle)
         };
-        let near = spawn_target(samples[5].center);
-        let far = spawn_target(samples[10].center);
-        let outside = spawn_target(samples[8].center + Vec3::X * 1.1);
-        let behind = spawn_target(jet.origin - jet.direction * 0.2);
-
-        game.begin_water_burst();
-        let doses = game.queue_water_douse();
-        let amount = |id| {
-            doses
-                .iter()
-                .find(|dose| dose.target == id)
-                .map(|dose| dose.amount)
-                .unwrap_or(0.0)
-        };
-        assert!(amount(near) > amount(far));
-        assert!(amount(far) > 0.0);
-        assert_eq!(amount(outside), 0.0);
-        assert_eq!(amount(behind), 0.0);
+        let near = spawn(samples[4].center);
+        let far = spawn(samples[10].center);
+        let emissions = water_jet_emissions(jet, game.ids.player);
         assert!(
-            doses.iter().map(|dose| dose.amount).sum::<f32>() <= WATER_DOUSE_BUDGET_PER_TURN + 1e-6
+            (emissions.iter().map(|e| e.amount).sum::<f32>() - WATER_DOUSE_BUDGET_PER_TURN).abs()
+                < 1e-6
         );
-        assert!(doses.iter().all(|dose| dose.coverage > 0.0));
+        for emission in emissions {
+            game.world.queue_interaction(Interaction::Water(emission));
+        }
+        let report = game.world.step(&game.environment);
         assert!(
-            doses
+            report
+                .transport
+                .water
                 .iter()
-                .find(|dose| dose.target == near)
-                .unwrap()
-                .distance
-                < doses
-                    .iter()
-                    .find(|dose| dose.target == far)
-                    .unwrap()
-                    .distance
+                .any(|t| t.target == near && t.delivered > 0.0)
         );
-        game.world.step(&game.environment);
-        let moisture = |id| {
+        assert!(
+            !report
+                .transport
+                .water
+                .iter()
+                .any(|t| t.target == far && t.delivered > 0.0)
+        );
+        game.world.entity_mut(near).unwrap().transform.position.x += 4.0;
+        for emission in water_jet_emissions(jet, game.ids.player) {
+            game.world.queue_interaction(Interaction::Water(emission));
+        }
+        assert!(
             game.world
-                .entity(id)
-                .unwrap()
-                .reactive_state
-                .unwrap()
-                .moisture
-        };
-        assert!(moisture(near) > moisture(far));
-        assert!(moisture(outside) < 1e-5);
-        assert!(moisture(behind) < 1e-5);
+                .step(&game.environment)
+                .transport
+                .water
+                .iter()
+                .any(|t| t.target == far && t.delivered > 0.0)
+        );
     }
 
     #[test]

@@ -8,6 +8,8 @@ repository = "https://github.com/pocket-stack/pocket-openworld"
 publish = false
 
 [dependencies]
+pocket-ui-wgpu = { path = "vendor/pocketjs/engine/crates/pocket-ui-wgpu" }
+wgpu = "25"
 pocket3d = { path = "vendor/pocketjs/engine/pocket3d/crates/pocket3d" }
 pocket3d-world = { path = "vendor/pocketjs/engine/pocket3d/crates/pocket3d-world" }
 winit = "0.30"

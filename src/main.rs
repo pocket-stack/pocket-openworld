@@ -6,7 +6,9 @@ mod game;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail, ensure};
-use game::{WorldGame, apply_campfire_douse_script, apply_carry_script, apply_orchard_script};
+use game::{
+    ShelterTrial, WorldGame, apply_campfire_douse_script, apply_carry_script, apply_orchard_script,
+};
 use pocket3d::app::{AppConfig, Game};
 use pocket3d::gpu::{Gpu, OFFSCREEN_FORMAT, OffscreenTarget};
 use pocket3d::input::Input;
@@ -24,6 +26,22 @@ const SCENARIOS: &[&str] = &[
     "grass-fire",
     "grass-burnout",
     "campfire-douse",
+    "shelter-rain",
+    "shelter-rain-moved",
+    "shelter-screen",
+    "shelter-screen-water",
+    "shelter-screen-open-water",
+    "shelter-dry",
+    "shelter-firebreak",
+    "shelter-firebreak-dry",
+    "controls-open",
+    "controls-rain",
+    "controls-screen",
+    "controls-screen-water",
+    "controls-firebreak",
+    "controls-firebreak-dry",
+    "controls-drag",
+    "controls-return",
 ];
 const CHARACTER_CARRY_CAPTURE_TICK: u64 = 360;
 const CHARACTER_CAST_CAPTURE_TICK: u64 = 24;
@@ -34,6 +52,8 @@ const GRASS_BURNOUT_CAPTURE_TICK: u64 = 210;
 #[derive(Debug)]
 struct Args {
     headless: bool,
+    shelter: bool,
+    ui_scale: f64,
     scenario: String,
     ticks: u64,
     seed: u64,
@@ -46,6 +66,8 @@ impl Default for Args {
     fn default() -> Self {
         Self {
             headless: false,
+            shelter: false,
+            ui_scale: 1.0,
             scenario: "orchard-fire".into(),
             ticks: 720,
             seed: 7,
@@ -64,20 +86,37 @@ fn main() -> Result<()> {
     } else {
         pocket3d::app::run(
             AppConfig {
-                title: "Pocket3D — Reactive Orchard".into(),
+                title: if args.shelter {
+                    "Pocket3D — Shelter Chemistry"
+                } else {
+                    "Pocket3D — Reactive Orchard"
+                }
+                .into(),
                 size: args.size,
                 tick_hz: 60.0,
                 capture_mouse: true,
                 max_fps: Some(60.0),
                 ..Default::default()
             },
-            WorldGame::new(args.seed),
+            if args.shelter {
+                {
+                    let mut game = WorldGame::new_shelter(args.seed);
+                    game.open_controls()?;
+                    game
+                }
+            } else {
+                WorldGame::new(args.seed)
+            },
         )
     }
 }
 
 fn run_headless(args: Args) -> Result<()> {
     ensure!(args.ticks > 0, "--ticks must be positive");
+    ensure!(
+        !args.shelter || ShelterTrial::from_scenario(&args.scenario).is_some(),
+        "--shelter opens the interactive lab; headless runs require --scenario shelter-rain, shelter-screen, or shelter-firebreak"
+    );
     if !SCENARIOS.contains(&args.scenario.as_str()) {
         bail!(
             "unknown scenario {:?}; expected one of {}",
@@ -117,8 +156,13 @@ fn run_headless(args: Args) -> Result<()> {
     }
     let gpu = Gpu::new_headless()?;
     let mut renderer = Renderer::new(&gpu, OFFSCREEN_FORMAT)?;
-    let mut game = WorldGame::new(args.seed);
+    let mut game = if args.shelter || ShelterTrial::from_scenario(&args.scenario).is_some() {
+        WorldGame::new_shelter(args.seed)
+    } else {
+        WorldGame::new(args.seed)
+    };
     game.init(&gpu, &mut renderer)?;
+    game.resized(args.size, args.ui_scale);
     if args.scenario == "campfire-douse" {
         game.prepare_campfire_douse_scenario();
     }
@@ -127,7 +171,11 @@ fn run_headless(args: Args) -> Result<()> {
     }
     let mut input = Input::default();
     for turn in 0..args.ticks {
-        apply_scenario_script(&mut input, &args.scenario, turn);
+        if game::control_scenario_ticks(&args.scenario).is_some() {
+            game.apply_control_script(&mut input, &args.scenario, turn)?;
+        } else {
+            apply_scenario_script(&mut input, &args.scenario, turn);
+        }
         game.frame(1.0 / 60.0, &input);
         game.tick(1.0 / 60.0, &input);
         input.end_frame();
@@ -137,6 +185,17 @@ fn run_headless(args: Args) -> Result<()> {
         let target = OffscreenTarget::new(&gpu, args.size.0, args.size.1);
         let (scene, camera, hud) = game.compose(0.0, args.ticks as f32 / 60.0, args.size);
         renderer.render(&gpu, &target.view, args.size, scene, camera, hud);
+        let mut encoder = gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        game.overlay(
+            &gpu,
+            &mut encoder,
+            &target.view,
+            OFFSCREEN_FORMAT,
+            args.size,
+        );
+        gpu.queue.submit([encoder.finish()]);
         target
             .save_png(&gpu, path)
             .with_context(|| format!("writing screenshot {}", path.display()))?;
@@ -200,9 +259,16 @@ fn run_headless(args: Args) -> Result<()> {
             receipt.water.campfire_douse
         );
     }
+    if ShelterTrial::from_scenario(&args.scenario).is_some() {
+        game.verify_shelter_scenario(&args.scenario)?;
+        println!("pocket-openworld: {} acceptance passed", args.scenario);
+    }
+    if game::control_scenario_ticks(&args.scenario).is_some() {
+        game.verify_control_scenario(&args.scenario)?;
+    }
     println!(
-        "pocket-openworld: {} turns, state {}, systemic acceptance {}",
-        receipt.ticks, receipt.state_hash, receipt.acceptance.playable_chain_complete
+        "pocket-openworld: {} turns, state {}",
+        receipt.ticks, receipt.state_hash
     );
     Ok(())
 }
@@ -213,6 +279,24 @@ fn parse_args() -> Result<Args> {
     while let Some(argument) = values.next() {
         match argument.as_str() {
             "--headless" => args.headless = true,
+            "--ui-build-info" => {
+                print!(
+                    "{}",
+                    include_str!(concat!(env!("OUT_DIR"), "/ui/manifest.json"))
+                );
+                std::process::exit(0);
+            }
+            "--shelter" => args.shelter = true,
+            "--ui-scale" => {
+                args.ui_scale = values
+                    .next()
+                    .context("--ui-scale requires a value")?
+                    .parse()?;
+                ensure!(
+                    args.ui_scale.is_finite() && args.ui_scale > 0.0 && args.ui_scale <= 4.0,
+                    "--ui-scale must be in (0, 4]"
+                );
+            }
             "--scenario" => {
                 args.scenario = values.next().context("--scenario requires a value")?;
             }
@@ -245,7 +329,7 @@ fn parse_args() -> Result<Args> {
             }
             "-h" | "--help" => {
                 println!(
-                    "pocket-openworld\n\n  --headless\n  --scenario orchard-fire|idle|character-walk|character-chop|character-cast|character-carry|character-water|grass-fire|grass-burnout|campfire-douse\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --screenshot PATH\n  --receipt PATH"
+                    "pocket-openworld\n\n  --shelter (interactive chemistry trials)\n  --headless\n  --scenario NAME (orchard, character, or shelter scenarios; see README.md)\n  --ticks N\n  --seed N\n  --size WIDTHxHEIGHT\n  --ui-scale N (headless UI display scale)\n  --screenshot PATH\n  --receipt PATH\n  --ui-build-info (embedded UI build inputs and artifact hashes)"
                 );
                 std::process::exit(0);
             }
@@ -264,6 +348,34 @@ fn parse_args() -> Result<Args> {
 }
 
 fn apply_scenario_script(input: &mut Input, scenario: &str, turn: u64) {
+    if let Some(trial) = ShelterTrial::from_scenario(scenario) {
+        for (key, pressed) in [
+            (KeyCode::Digit2, turn == 0 && trial == ShelterTrial::Screen),
+            (
+                KeyCode::Digit3,
+                turn == 0 && trial == ShelterTrial::Firebreak,
+            ),
+            (
+                KeyCode::KeyT,
+                game::shelter_script_actions(scenario, turn)[0],
+            ),
+            (
+                KeyCode::KeyF,
+                game::shelter_script_actions(scenario, turn)[1],
+            ),
+            (
+                KeyCode::KeyE,
+                game::shelter_script_actions(scenario, turn)[2],
+            ),
+            (
+                KeyCode::KeyQ,
+                game::shelter_script_actions(scenario, turn)[3],
+            ),
+        ] {
+            input.inject_key(key, pressed);
+        }
+        return;
+    }
     match scenario {
         "orchard-fire" => apply_orchard_script(input, turn),
         "character-walk" => input.inject_key(KeyCode::KeyW, true),
