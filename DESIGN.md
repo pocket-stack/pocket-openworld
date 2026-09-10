@@ -49,9 +49,8 @@ it does not duplicate heat.
 
 One simulation turn uses this order:
 
-1. Consume queued player interactions and apply impulses, cuts, ignition, or
-   water.
-2. Resolve attachments from parent transforms.
+1. Resolve attachments from parent transforms.
+2. Consume queued player interactions and spatial water packets, then rainfall.
 3. Sample ambient temperature, moisture, wind, and ground height.
 4. Transfer heat, evaporate moisture, ignite eligible fuel, and consume fuel.
 5. Integrate dynamic bodies and resolve ground and body contacts.
@@ -165,6 +164,88 @@ also writes a receipt with the seed, tick count, state hash, ordered events,
 tree state, detached-fruit count, temperatures, fuel, and cooking state.
 The Blender receipt separately records asset topology, bone and clip contracts,
 rest-pose ground contact, hand and axe travel, and self-contained GLB checks.
+
+## Shelter chemistry
+
+`src/shelter.rs` owns the three trial recipes, material amounts, paired spray
+fixtures, sliding controls, camera and HUD. The trials submit the same
+`Interaction::Water` packets used by the staff spray in the orchard. The app
+authors nozzle paths and visual geometry; it does not select water recipients
+or allocate doses. The staff draws three of its actual emitted packet paths;
+`World::water_path_distance` clips the center and both side streams at the same
+receiver geometry used for delivery. Collision, locomotion and water reception
+share world-space capsule endpoints and radius, including nonuniform scale.
+The old application-side overlap and dose solver is removed.
+
+`pocket3d-world` owns transformed `TransportSurface` permeability, ordered packet
+interception, bounded `Rainfall`, sensible-heat mixing, saturation runoff,
+energy-funded evaporation and radiant-heat interception. Thermal contact uses
+sphere/capsule surface gaps. Transport boxes do not add rigid-body collision;
+sliding panels are application-authored fixtures with authoritative transforms.
+
+**Rain and spray share a finite transported-water budget.** Each packet's mass
+is retained, exported as runoff, or leaves its path. Rain samples a fixed spatial
+grid, so overlapping receivers cannot multiply input water. Runoff and escaped
+water are recorded sinks; this iteration does not simulate puddles or lateral
+flow. Surface drying pays latent heat and is bounded by a humidity-dependent
+cooling floor. Trial exchange coefficients and material amounts set observable
+reaction times in this normalized model.
+
+**Screens intercept an existing radiant-energy share.** A blocked target does
+not donate additional heat to other targets. Heat intercepted by a reactive
+barrier enters its thermal state; an inert barrier exports that heat. A panel
+can block radiation and liquid water with separate coefficients.
+
+The world reports per-target water delivery, heat reception/interception and
+ignition conditions. The app accumulates these receipts for the HUD and tests.
+The external weather sample and trial controls remain application-owned. The
+headless path runs normal frame/input/tick calls and compares complete receipts
+on replay. The default orchard and character asset contract have separate
+regressions alongside the eight new comparisons.
+
+## Clickable control window
+
+`ui/main.tsx` is a PocketJS application rendered over the scene by
+`pocket-ui-wgpu::UiOverlay`. It consumes the shared XP theme and sends action
+intents over the in-process overlay channel. `src/controls.rs` owns the view
+model, commands, comparison schedules and acceptance state. Automatic and
+headless shelter sequences share one action schedule. They submit normal
+interactions, inspect world state, then pause for observation.
+
+The native host honors `Game::cursor_mode`: the window requests a visible
+pointer and the game requests capture. Mode changes discard held input; the
+application also blocks movement/action polling while the window owns input.
+Closing resumes simulation and stops a pending automatic comparison. Focus
+loss cancels a pointer press instead of producing a click.
+
+`Input` retains ordered pointer edges, so a full click between two frames is
+preserved. The overlay maps physical coordinates to the same logical scale as
+its renderer. Tests locate named controls through the core's painted bounds,
+then inject real cursor/button edges. They cover drags, cancellation, disabled
+controls, viewport changes and 1x/2x scaling. A scene camera uses the window's
+painted bounds to keep the paired fixtures visible beside it.
+
+`build.rs` invokes the pinned Bun toolchain and PocketJS compiler before Cargo
+compiles the application. The JS/PAK pair and build manifest live under Cargo's
+`OUT_DIR` and are embedded in the executable. Compiler-reported dependencies
+drive rebuilds when application modules, shared framework code, dependencies
+or fonts change. Missing output files trigger regeneration; failed generation
+fails the Cargo build. No generated bundle is read from the source tree.
+
+`--ui-build-info` emits the manifest embedded in the executable. Acceptance
+compares its application/compiler/font input hashes to the current checkout,
+so an old executable cannot borrow a newer sidecar manifest. Full receipts,
+PNGs and logs are CI artifacts, not versioned test baselines. The repository
+owns scenarios and assertions; the workflow stores each run's evidence.
+
+`src/hud.rs` supplies gameplay display data to `ui/hud.tsx`. Both the passive
+HUD and the interactive window use the same overlay guest, Inter Regular/Bold
+atlases and logical display scale. `ui/text.tsx` wraps paragraphs using the
+same native font slot that paints them; notification widths use that provider's
+measurement instead of character counts. The presentation model refreshes after
+scene composition so projected labels and state readings match the rendered
+frame. Only the open control window receives pointer events. The legacy HUD
+pass draws the geometric crosshair; application text uses PocketJS components.
 
 ## Growth path
 

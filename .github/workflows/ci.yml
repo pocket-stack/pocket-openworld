@@ -27,10 +27,17 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
       - uses: Swatinem/rust-cache@v2
 
       - name: Record engine revision
         run: git submodule status --recursive
+
+      - name: Reject committed build and acceptance output
+        run: python3 tools/check_generated.py
 
       - name: Check formatting
         run: cargo fmt --package pocket-openworld -- --check
@@ -41,29 +48,17 @@ jobs:
       - name: Lint
         run: cargo clippy --locked --package pocket-openworld --all-targets -- -D warnings
 
-      - name: Create acceptance directory
-        run: mkdir -p artifacts
+      - name: Build acceptance executable
+        run: cargo build --locked --package pocket-openworld
 
-      - name: Verify orchard interactions
-        run: >-
-          cargo run --locked --package pocket-openworld --
-          --headless --scenario orchard-fire --ticks 720 --seed 7 --size 960x600
-          --receipt artifacts/orchard-fire.json
-          --screenshot artifacts/orchard-fire.png
+      - name: Verify automatic UI generation and rebuilds
+        run: python3 tools/verify_build.py
 
-      - name: Verify water rendering
-        run: >-
-          cargo run --locked --package pocket-openworld --
-          --headless --scenario character-water --ticks 47 --size 960x600
-          --receipt artifacts/character-water.json
-          --screenshot artifacts/character-water.png
+      - name: Verify clickable controls, chemistry and orchard regressions
+        run: python3 tools/verify_shelter.py --output artifacts
 
-      - name: Verify sustained extinguishing
-        run: >-
-          cargo run --locked --package pocket-openworld --
-          --headless --scenario campfire-douse --ticks 390 --size 960x600
-          --receipt artifacts/campfire-douse.json
-          --screenshot artifacts/campfire-douse.png
+      - name: Verify UI at 2x display scale
+        run: python3 tools/verify_shelter.py --scenario controls-open --scenario controls-firebreak --scenario character-water --scenario shelter-rain --scenario controls-stop --scenario water-receiver-blocked --scenario water-receiver-open --size 1920x1200 --ui-scale 2 --output artifacts/2x
 
       - name: Upload acceptance evidence
         if: always()
@@ -72,3 +67,4 @@ jobs:
           name: pocket-openworld-acceptance
           path: artifacts/
           if-no-files-found: error
+          retention-days: 30

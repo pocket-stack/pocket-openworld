@@ -11,6 +11,9 @@
   or collider configurations. Scenario regressions are additional coverage.
 - Treat state receipts as simulation evidence and screenshots as rendering
   evidence. A gameplay acceptance change that affects both must verify both.
+- Generate UI bundles and manifests during the build under Cargo's OUT_DIR.
+  Do not commit generated JS/PAK files, per-run receipts, screenshots or logs.
+  Keep acceptance scripts and assertions here; publish outputs as CI artifacts.
 - Use Conventional Commits for commits and pull request titles. Open completed
   changes as Draft pull requests, then mark them ready only after the relevant
   tests and headless scenarios pass.
