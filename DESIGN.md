@@ -171,7 +171,11 @@ rest-pose ground contact, hand and axe travel, and self-contained GLB checks.
 fixtures, sliding controls, camera and HUD. The trials submit the same
 `Interaction::Water` packets used by the staff spray in the orchard. The app
 authors nozzle paths and visual geometry; it does not select water recipients
-or allocate doses. The old application-side overlap and dose solver is removed.
+or allocate doses. The staff draws three of its actual emitted packet paths;
+`World::water_path_distance` clips the center and both side streams at the same
+receiver geometry used for delivery. Collision, locomotion and water reception
+share world-space capsule endpoints and radius, including nonuniform scale.
+The old application-side overlap and dose solver is removed.
 
 `pocket3d-world` owns transformed `TransportSurface` permeability, ordered packet
 interception, bounded `Rainfall`, sensible-heat mixing, saturation runoff,

@@ -56,8 +56,8 @@ python3 tools/verify_shelter.py --output target/acceptance/controls
 ```
 
 脚本从待测二进制读取嵌入的 UI 构建清单，核对源码、编译器和字体哈希，
-拒绝使用旧 UI 的二进制，再运行 26 个场景：8 个窗口点击场景、
-8 个化学对照、10 个原有场景。点击测试从 PocketJS 原生核心的实际控件位置
+拒绝使用旧 UI 的二进制，再运行 29 个场景：9 个窗口输入场景、
+8 个化学对照、10 个原有场景和 2 个法杖水流遮挡场景。点击测试从 PocketJS 原生核心的实际控件位置
 注入鼠标按下和释放，经过同一套焦点与 onPress 处理；再比较完整状态回放并输出 PNG。
 
 单独查看窗口对照：
@@ -81,3 +81,21 @@ Cargo 自动安装锁定的 JS 依赖、生成 JS／字体 PAK 并嵌入二进�
 `target` 下。构建后的游戏不需要 Bun。完整验收输出放在本地 `target/acceptance`
 或 CI 的 `pocket-openworld-acceptance` artifact 中，保留 30 天；它们不提交到 Git。
 PR 验收请核对 workflow 对应的提交，再下载其 artifact 查看 PNG、JSON 和日志。
+
+## 回归验收
+
+- 移动时按 Tab：角色立即停下并回到 Idle；窗口关闭的当帧仍不移动，下一帧恢复 WASD。
+  `controls-stop` 截图和回执检查这个状态，单元测试另外放置两种接触物，确认没有虚假碰撞冲量。
+- `water-receiver-blocked`：前方木柴接收水，水束在命中处结束，后方木柴没有收到水。
+- `water-receiver-open`：把前方木柴移到侧面，水束继续到后方木柴，后方开始收到水。
+  两个回执都对比实际绘制的中心水束长度和引擎命中距离。
+
+```sh
+python3 tools/verify_shelter.py --scenario controls-stop \
+  --scenario water-receiver-blocked --scenario water-receiver-open \
+  --output target/acceptance/regressions
+```
+
+直接对照输出目录里的三张 PNG；原始回执与截图由 CI 一起上传，不提交到 Git。
+胶囊边缘命中由 PocketJS 的多种缩放/旋转配置测试覆盖，应用另保留 seed=7
+的 `grass tuft 2` 回归：从中心上方 0.451 米掠过不会额外加湿。

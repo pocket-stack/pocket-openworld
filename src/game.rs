@@ -32,6 +32,9 @@ pub use controls::{ControlReceipt, control_scenario_ticks, shelter_script_action
 #[path = "hud.rs"]
 mod hud;
 
+#[path = "regressions.rs"]
+mod regressions;
+
 #[path = "shelter.rs"]
 mod shelter;
 pub use shelter::ShelterTrial;
@@ -383,22 +386,6 @@ fn water_jet_emissions(jet: WaterJet, source: EntityId) -> Vec<pocket3d_world::W
         .collect()
 }
 
-fn water_curtain_point(
-    sample: WaterJetSample,
-    right: Vec3,
-    up: Vec3,
-    side: f32,
-    sample_index: usize,
-    burst_age: u16,
-) -> Vec3 {
-    let phase = burst_age as f32 * 0.53 + sample_index as f32 * 1.37;
-    let lateral = sample.radius * (0.66 + phase.sin() * 0.12);
-    let vertical = sample.radius * phase.cos() * 0.10;
-    sample.center + right * side.signum() * lateral + up * vertical
-}
-
-/// Return the normalized position on the first segment and the squared
-/// distance between the two closest points.
 fn water_hud_state(remaining_turns: u16) -> WaterHudState {
     WaterHudState {
         spraying: remaining_turns > 0,
@@ -784,6 +771,8 @@ pub struct WaterReceipt {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct WorldReceipt {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub regression: Option<serde_json::Value>,
     pub shelter: Option<shelter::ShelterReceipt>,
     pub controls: ControlReceipt,
     pub schema: &'static str,
@@ -916,6 +905,7 @@ impl WorldGame {
             })
             .collect();
         WorldReceipt {
+            regression: None,
             shelter: self.shelter_receipt(),
             controls: self.control_receipt(),
             schema: "pocket3d.playable-world.receipt.v1",
@@ -1191,6 +1181,13 @@ impl WorldGame {
 
     fn move_player(&mut self, input: &Input, dt: f32) {
         if self.controls.open || self.controls.block_gameplay_frame {
+            if let Some(body) = self
+                .world
+                .entity_mut(self.ids.player)
+                .and_then(|p| p.body.as_mut())
+            {
+                body.linear_velocity = Vec3::ZERO;
+            }
             return;
         }
         let axis = Vec2::new(
@@ -1799,48 +1796,50 @@ impl WorldGame {
         let Some(jet) = self.current_water_jet_for_turns(self.water_pose_turns) else {
             return;
         };
-        let burst_age = WATER_BURST_TURNS.saturating_sub(self.water_pose_turns);
         let samples = water_jet_samples(jet);
-        let right = jet.direction.cross(Vec3::Y).normalize_or(Vec3::X);
-        let up = right.cross(jet.direction).normalize_or(Vec3::Y);
-        for segment in samples.windows(2) {
-            let sample = segment[1];
-            let fade = 0.34 + sample.retention * 0.66;
-            self.scene.beams.push(Beam {
-                a: segment[0].center,
-                b: sample.center,
-                width: 0.10 - sample.distance / jet.length * 0.035,
-                color: [0.12, 0.68, 1.0, 0.94 * fade],
-            });
-            self.scene.sprites.push(Sprite {
-                pos: sample.center,
-                size: 0.13 + sample.radius * 0.10,
-                color: [0.30, 0.84, 1.0, 0.86 * fade],
-            });
-        }
-        // Two deterministic curtains stay within the same sampled
-        // cross-sections used by hit testing. They make the short burst read
-        // from a rear camera without inventing a second gameplay trajectory.
-        for side in [-1.0_f32, 1.0] {
-            let mut previous = jet.origin;
-            for (index, sample) in samples.iter().copied().enumerate().skip(1) {
+        let emissions = water_jet_emissions(jet, self.ids.player);
+        // Draw the center and the two horizontal paths on the two-thirds ring.
+        // These are actual emitted packets, so their shape and interception
+        // are shared with delivery instead of using separate visual curtains.
+        for path_index in [0, 9, 17] {
+            let path = &emissions[path_index];
+            let mut remaining = self.world.water_path_distance(path);
+            for (index, pair) in path.points.windows(2).enumerate() {
+                if remaining <= 1e-6 {
+                    break;
+                }
+                let length = pair[0].distance(pair[1]);
+                let endpoint = pair[0].lerp(pair[1], (remaining / length).clamp(0.0, 1.0));
+                let sample = samples[index + 1];
                 let fraction = sample.distance / jet.length;
-                let point = water_curtain_point(sample, right, up, side, index, burst_age);
-                let fade = (0.34 + sample.retention * 0.66) * (1.0 - fraction * 0.18);
+                let fade = 0.34 + sample.retention * 0.66;
+                let center = path_index == 0;
                 self.scene.beams.push(Beam {
-                    a: previous,
-                    b: point,
-                    width: 0.058 - fraction * 0.018,
-                    color: [0.16, 0.72, 1.0, 0.78 * fade],
+                    a: pair[0],
+                    b: endpoint,
+                    width: if center {
+                        0.10 - fraction * 0.035
+                    } else {
+                        0.058 - fraction * 0.018
+                    },
+                    color: if center {
+                        [0.12, 0.68, 1.0, 0.94 * fade]
+                    } else {
+                        [0.16, 0.72, 1.0, 0.78 * fade]
+                    },
                 });
-                if index % 2 == 1 {
+                if center || index % 2 == 0 {
                     self.scene.sprites.push(Sprite {
-                        pos: point,
-                        size: 0.10 + sample.radius * 0.16,
-                        color: [0.42, 0.88, 1.0, 0.75 * fade],
+                        pos: endpoint,
+                        size: if center {
+                            0.13 + sample.radius * 0.10
+                        } else {
+                            0.10 + sample.radius * 0.16
+                        },
+                        color: [0.30, 0.84, 1.0, 0.86 * fade],
                     });
                 }
-                previous = point;
+                remaining -= length;
             }
         }
         self.scene.sprites.push(Sprite {
@@ -3061,18 +3060,6 @@ mod tests {
                 .windows(2)
                 .all(|pair| pair[0].retention > pair[1].retention)
         );
-
-        let right = jet.direction.cross(Vec3::Y).normalize_or(Vec3::X);
-        let up = right.cross(jet.direction).normalize_or(Vec3::Y);
-        for side in [-1.0, 1.0] {
-            for (index, sample) in first.iter().copied().enumerate().skip(1) {
-                let point = water_curtain_point(sample, right, up, side, index, 7);
-                assert!(
-                    point.distance(sample.center) <= sample.radius + 1e-5,
-                    "visible curtains must stay inside the gameplay cross-section"
-                );
-            }
-        }
     }
 
     #[test]
@@ -3145,6 +3132,62 @@ mod tests {
                 .iter()
                 .any(|t| t.target == far && t.delivered > 0.0)
         );
+    }
+
+    #[test]
+    fn visible_staff_stream_stops_at_the_water_receiver_and_reopens_when_moved() {
+        let mut game = WorldGame::new(7);
+        game.water_pose_turns = WATER_BURST_TURNS;
+        let jet = game
+            .current_water_jet_for_turns(game.water_pose_turns)
+            .unwrap();
+        let samples = water_jet_samples(jet);
+        let mut bundle = EntityBundle::new(Transform::from_translation(samples[4].center));
+        bundle.collider = Some(Collider::Sphere { radius: 0.6 });
+        bundle.reactive_material = Some(wood_material());
+        bundle.reactive_state = Some(ReactiveState::new(24.0, 0.0, 1.0));
+        let receiver = game.world.spawn(bundle);
+        for blocked in [true, false] {
+            if !blocked {
+                game.world
+                    .entity_mut(receiver)
+                    .unwrap()
+                    .transform
+                    .position
+                    .x += 4.0;
+            }
+            let emission = &water_jet_emissions(jet, game.ids.player)[0];
+            let expected = game.world.water_path_distance(emission);
+            assert_eq!(expected < 1.0, blocked);
+            game.scene.beams.clear();
+            game.scene.sprites.clear();
+            game.render_water_burst();
+            let center: Vec<_> = game
+                .scene
+                .beams
+                .iter()
+                .filter(|b| b.color[0] == 0.12)
+                .collect();
+            let visible: f32 = center.iter().map(|b| b.a.distance(b.b)).sum();
+            assert!(
+                (visible - expected).abs() < 1e-5,
+                "rendered {visible} metres, water reaches {expected} metres"
+            );
+            if blocked {
+                assert!(
+                    game.scene
+                        .beams
+                        .iter()
+                        .all(|b| b.b.distance(jet.origin) < 1.0)
+                );
+                assert!(
+                    game.scene
+                        .sprites
+                        .iter()
+                        .all(|s| s.pos.distance(jet.origin) < 1.0)
+                );
+            }
+        }
     }
 
     #[test]

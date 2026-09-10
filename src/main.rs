@@ -42,6 +42,9 @@ const SCENARIOS: &[&str] = &[
     "controls-firebreak-dry",
     "controls-drag",
     "controls-return",
+    "controls-stop",
+    "water-receiver-blocked",
+    "water-receiver-open",
 ];
 const CHARACTER_CARRY_CAPTURE_TICK: u64 = 360;
 const CHARACTER_CAST_CAPTURE_TICK: u64 = 24;
@@ -169,6 +172,12 @@ fn run_headless(args: Args) -> Result<()> {
     if matches!(args.scenario.as_str(), "grass-fire" | "grass-burnout") {
         game.prepare_grass_fire_scenario();
     }
+    if matches!(
+        args.scenario.as_str(),
+        "water-receiver-blocked" | "water-receiver-open"
+    ) {
+        game.prepare_water_occlusion_scenario(args.scenario == "water-receiver-open");
+    }
     let mut input = Input::default();
     for turn in 0..args.ticks {
         if game::control_scenario_ticks(&args.scenario).is_some() {
@@ -181,9 +190,9 @@ fn run_headless(args: Args) -> Result<()> {
         input.end_frame();
     }
 
+    let (scene, camera, hud) = game.compose(0.0, args.ticks as f32 / 60.0, args.size);
     if let Some(path) = args.screenshot.as_deref() {
         let target = OffscreenTarget::new(&gpu, args.size.0, args.size.1);
-        let (scene, camera, hud) = game.compose(0.0, args.ticks as f32 / 60.0, args.size);
         renderer.render(&gpu, &target.view, args.size, scene, camera, hud);
         let mut encoder = gpu
             .device
@@ -202,7 +211,8 @@ fn run_headless(args: Args) -> Result<()> {
         println!("pocket-openworld: wrote screenshot {}", path.display());
     }
 
-    let receipt = game.runtime_receipt(args.scenario.clone());
+    let mut receipt = game.runtime_receipt(args.scenario.clone());
+    receipt.regression = game.verify_regression_scenario(&args.scenario)?;
     let receipt_json = serde_json::to_string_pretty(&receipt)?;
     if let Some(path) = args.receipt.as_deref() {
         if let Some(parent) = path.parent() {
@@ -377,6 +387,9 @@ fn apply_scenario_script(input: &mut Input, scenario: &str, turn: u64) {
         return;
     }
     match scenario {
+        "water-receiver-blocked" | "water-receiver-open" => {
+            input.inject_key(KeyCode::KeyQ, turn == 0)
+        }
         "orchard-fire" => apply_orchard_script(input, turn),
         "character-walk" => input.inject_key(KeyCode::KeyW, true),
         "character-chop" => {

@@ -406,6 +406,7 @@ pub fn control_scenario_ticks(name: &str) -> Option<u64> {
         "controls-firebreak" | "controls-firebreak-dry" => 1806,
         "controls-drag" => 8,
         "controls-return" => 12,
+        "controls-stop" => 12,
         _ => return None,
     })
 }
@@ -425,6 +426,11 @@ impl WorldGame {
     }
 
     pub fn apply_control_script(&self, input: &mut Input, name: &str, turn: u64) -> Result<()> {
+        if name == "controls-stop" {
+            input.inject_key(KeyCode::KeyW, true);
+            input.inject_key(KeyCode::Tab, turn == 8);
+            return Ok(());
+        }
         input.inject_key(KeyCode::Tab, turn == 0);
         let trial = match name {
             "controls-rain" => "trial-rain",
@@ -497,7 +503,7 @@ impl WorldGame {
                     c.commands.iter().any(|s| s == "trial:firebreak"),
                     "clicking after drag failed"
                 );
-            } else if name != "controls-open" {
+            } else if !matches!(name, "controls-open" | "controls-stop") {
                 ensure!(
                     c.outcome == "passed" && c.paused && !c.running && c.progress == 1.0,
                     "comparison did not pass and pause: {c:?}"
@@ -517,6 +523,70 @@ mod tests {
         game.frame(1.0 / 60.0, input);
         game.tick(1.0 / 60.0, input);
         input.end_frame();
+    }
+
+    #[test]
+    fn opening_controls_stops_motion_without_pushing_touching_bodies() {
+        for (collider, mass) in [
+            (Collider::Sphere { radius: 0.3 }, 1.0),
+            (
+                Collider::CapsuleY {
+                    radius: 0.3,
+                    half_height: 0.2,
+                },
+                4.0,
+            ),
+        ] {
+            let mut game = WorldGame::new(7);
+            game.world.config_mut().gravity = Vec3::ZERO;
+            let mut input = Input::default();
+            input.inject_key(KeyCode::KeyD, true);
+            step(&mut game, &mut input);
+            let player = game.world.entity(game.ids.player).unwrap();
+            let direction = player.body.unwrap().linear_velocity.normalize();
+            assert!(player.body.unwrap().linear_velocity.length() > 3.5);
+            let stopped = player.transform.position;
+            let phase = game.walk_phase;
+            let mut touching =
+                EntityBundle::new(Transform::from_translation(stopped + direction * 0.55));
+            touching.collider = Some(collider);
+            touching.body = Some(Body::dynamic(mass));
+            let touching = game.world.spawn(touching);
+            input.inject_key(KeyCode::Tab, true);
+            step(&mut game, &mut input);
+            input.inject_key(KeyCode::Tab, false);
+            for _ in 0..3 {
+                assert_eq!(game.player_position(), stopped);
+                assert_eq!(
+                    game.world
+                        .entity(game.ids.player)
+                        .unwrap()
+                        .body
+                        .unwrap()
+                        .linear_velocity,
+                    Vec3::ZERO
+                );
+                assert!(
+                    game.world
+                        .entity(touching)
+                        .unwrap()
+                        .body
+                        .unwrap()
+                        .linear_velocity
+                        .length()
+                        < 1e-5
+                );
+                assert_eq!(game.walk_phase, phase);
+                step(&mut game, &mut input);
+            }
+            // Closing consumes the current frame; held movement resumes next frame.
+            input.inject_key(KeyCode::Tab, true);
+            step(&mut game, &mut input);
+            assert_eq!(game.player_position(), stopped);
+            input.inject_key(KeyCode::Tab, false);
+            step(&mut game, &mut input);
+            assert_ne!(game.player_position(), stopped);
+        }
     }
 
     #[test]

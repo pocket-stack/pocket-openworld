@@ -58,7 +58,7 @@ jobs:
         run: python3 tools/verify_shelter.py --output artifacts
 
       - name: Verify UI at 2x display scale
-        run: python3 tools/verify_shelter.py --scenario controls-open --scenario controls-firebreak --scenario character-water --scenario shelter-rain --size 1920x1200 --ui-scale 2 --output artifacts/2x
+        run: python3 tools/verify_shelter.py --scenario controls-open --scenario controls-firebreak --scenario character-water --scenario shelter-rain --scenario controls-stop --scenario water-receiver-blocked --scenario water-receiver-open --size 1920x1200 --ui-scale 2 --output artifacts/2x
 
       - name: Upload acceptance evidence
         if: always()

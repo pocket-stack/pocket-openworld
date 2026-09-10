@@ -74,8 +74,8 @@ python3 tools/verify_shelter.py --output target/acceptance/controls
 ```
 
 This reads UI build provenance from the executable, checks its input hashes,
-and verifies all 26 scenarios: eight window/input cases,
-eight shelter comparisons and ten orchard regressions. Each has an identical
+and verifies all 29 scenarios: nine window/input cases,
+eight shelter comparisons, ten orchard regressions and two staff-water occlusion cases. Each has an identical
 complete receipt replay and a PNG. `cargo build`, `cargo test` and `cargo run`
 generate JS, font/style PAK and their manifest under Cargo's `OUT_DIR`.
 UI, shared framework and font changes trigger regeneration. The built game
